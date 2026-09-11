@@ -1,0 +1,11 @@
+# AVANTI theme. Streamlit handles light/dark natively from the user's OS
+# setting, so there is no need for hand-rolled CSS background injection.
+[theme]
+primaryColor = "#4f46e5"
+font = "sans serif"
+
+[server]
+maxUploadSize = 50
+
+[browser]
+gatherUsageStats = false
