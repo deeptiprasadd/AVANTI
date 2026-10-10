@@ -10,7 +10,8 @@ what the authors built, what data they used, what they measured, and what
 they admit it cannot do. Then ask the paper questions and get answers cited
 to a page.
 
-Everything runs locally. No API key required. Scanned PDFs are read with OCR.
+Everything runs locally. No API key required.
+(Scanned-PDF OCR is available when running locally — see below.)
 
 ---
 
@@ -105,23 +106,30 @@ python -m venv .venv
 
 On macOS or Linux use `.venv/bin/` instead of `.venv/Scripts/`.
 
-### OCR for scanned PDFs
+### OCR for scanned PDFs — local only
 
-Included in `requirements.txt` via `rapidocr-onnxruntime`, which bundles its
-own models and needs no Tesseract install. Budget about ten seconds a page
-on CPU.
+OCR is **not installed on the hosted demo**, and this is deliberate.
+`rapidocr-onnxruntime` pulls in OpenCV and onnxruntime: about 100MB of
+wheels, 41% of the entire install, and enough to push Streamlit Community
+Cloud's free build past its limit. The app detects OCR's absence and
+reports a scanned PDF rather than failing on it.
 
-On Linux it also needs two system libraries, listed in `packages.txt` —
-without them OpenCV fails to import with `libGL.so.1: cannot open shared
-object file`. Streamlit Community Cloud installs that file automatically;
-elsewhere:
+To enable it locally:
+
+```bash
+.venv/Scripts/pip install rapidocr-onnxruntime
+```
+
+On Linux it also needs two system libraries, or OpenCV fails to import with
+`libGL.so.1: cannot open shared object file`:
 
 ```bash
 sudo apt-get install -y libgl1 libglib2.0-0
 ```
 
-To run without OCR, set `AVANTI_ENABLE_OCR=0`. Scanned PDFs are then
-reported rather than read, and everything else is unaffected.
+Budget about ten seconds a page on CPU. `AVANTI_ENABLE_OCR=0` switches it
+off again without uninstalling, and `AVANTI_OCR_DPI` trades accuracy for
+speed.
 
 ### Optional: the AI panel
 
@@ -153,7 +161,6 @@ tests/
   test_ocr_and_llm.py  OCR reading order, Gemini model selection
 
 requirements.txt       runtime dependencies
-packages.txt           apt packages Streamlit Cloud installs (OpenCV needs these)
 ```
 
 Each stage is a pure function over text, so it can be tested without a PDF

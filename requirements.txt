@@ -10,8 +10,14 @@ scikit-learn==1.9.1        # TF-IDF + cosine similarity
 feedparser==6.0.14         # parses the arXiv Atom feed
 requests==2.34.2           # HTTP: arXiv + Gemini
 
-# --- OCR for scanned PDFs ---
-rapidocr-onnxruntime==1.2.3  # bundles its own models, no Tesseract needed
-
+# NOTE: OCR for scanned PDFs is deliberately NOT installed here.
+# rapidocr-onnxruntime pulls in OpenCV and onnxruntime, about 100MB of
+# wheels -- 41% of the whole install -- and that tips Streamlit Community
+# Cloud's free build over its limit ("Error installing requirements").
+# The app detects its absence and reports scanned PDFs instead of reading
+# them. To enable OCR when running locally:
+#
+#     pip install rapidocr-onnxruntime
+#
 # --- Streamlit UI (app.py) ---
 streamlit==1.63.0
