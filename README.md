@@ -1,15 +1,3 @@
----
-title: AVANTI
-emoji: 📄
-colorFrom: indigo
-colorTo: blue
-sdk: docker
-app_port: 7860
-pinned: false
-license: mit
-short_description: Reads a research PDF the way you would, and cites its answers.
----
-
 # AVANTI
 
 A research paper analyzer that reads a PDF the way you would — structure

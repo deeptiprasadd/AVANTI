@@ -19,6 +19,7 @@ its gutter so the columns do not interleave.
 from __future__ import annotations
 
 import io
+import os
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional, Tuple
 
@@ -52,7 +53,7 @@ except ImportError:  # pragma: no cover - depends on install
 # Rendering resolution. Measured on a 2-column scan, 110/150/220 DPI all
 # recover the same text (589/598/577 words), because the detector rescales
 # internally anyway -- so there is nothing to gain from rendering larger.
-DEFAULT_DPI = 150
+DEFAULT_DPI = int(os.environ.get("AVANTI_OCR_DPI", "150"))
 
 # Tuning, measured on one page of a dense two-column scan:
 #
@@ -78,9 +79,23 @@ INSTALL_HINT = (
 )
 
 
+def _enabled() -> bool:
+    """OCR can be switched off per deployment.
+
+    The app idles at about 270MB, but an OCR pass adds a page bitmap plus
+    the model's working set on top. On a 512MB free tier that is close
+    enough to the ceiling to risk the container being killed mid-request,
+    so a host can opt out with AVANTI_ENABLE_OCR=0 and the app degrades to
+    reporting scanned PDFs rather than reading them.
+    """
+    return os.environ.get("AVANTI_ENABLE_OCR", "1").strip().lower() not in (
+        "0", "false", "no", "off"
+    )
+
+
 def backend() -> Optional[str]:
     """Which OCR backend is usable, or None."""
-    if not HAS_RASTERIZER:
+    if not _enabled() or not HAS_RASTERIZER:
         return None
     if HAS_RAPIDOCR:
         return "rapidocr"
@@ -92,10 +107,16 @@ def backend() -> Optional[str]:
 def backend_label() -> str:
     """Human-readable backend name for the UI."""
     name = backend()
-    return {
-        "rapidocr": "RapidOCR (bundled models)",
-        "pytesseract": "Tesseract",
-    }.get(name or "", "not installed")
+    if name:
+        return {
+            "rapidocr": "RapidOCR (bundled models)",
+            "pytesseract": "Tesseract",
+        }[name]
+    # Distinguish "switched off here" from "never installed" -- otherwise a
+    # deployment that deliberately disabled OCR looks like a broken install.
+    if not _enabled():
+        return "disabled on this deployment"
+    return "not installed"
 
 
 def available() -> bool:
