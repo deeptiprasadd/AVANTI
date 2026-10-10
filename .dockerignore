@@ -1,0 +1,16 @@
+.venv/
+.git/
+.github/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+tests/
+docs/
+.vscode/
+.streamlit/secrets.toml
+app.py
+requirements-streamlit.txt
+README.md
+*.md

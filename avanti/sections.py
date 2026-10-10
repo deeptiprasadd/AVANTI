@@ -77,18 +77,41 @@ _NUMBER_PREFIX = re.compile(
 _INTERNAL_BREAK = re.compile(r"\.\s+\S")
 
 
+# Markers whose nesting level is set by style rather than by dot count.
+_ROMAN_MARKER = re.compile(r"^[IVXLC]{1,5}[.)]$")
+_LETTER_MARKER = re.compile(r"^[A-H][.)]$")
+_PAREN_NUMBER = re.compile(r"^\(?\d{1,2}\)$")
+
+
 def _strip_number(line: str) -> Tuple[str, bool, int]:
     """Remove a leading section number.
 
-    Returns (rest, had_number, depth), where depth is the numbering level:
-    "3." is depth 1, "3.1" is depth 2, "3.1.2" is depth 3.
+    Returns (rest, had_number, depth), where depth is the nesting level.
+
+    Depth comes from the *style* of the marker, not from counting dots. An
+    IEEE-format paper numbers its top-level sections with Roman numerals,
+    its subsections with letters, and the points inside them with "1)" --
+    all of which have a single dot and would otherwise read as depth 1.
+    That promoted every subsection and bullet to a top-level section: one
+    six-page paper came out with eighteen of them.
     """
     m = _NUMBER_PREFIX.match(line)
     if not m:
         return line.strip(), False, 0
+
     token = m.group(0).strip()
-    depth = len([p for p in token.strip("().").split(".") if p])
-    return line[m.end():].strip(), True, max(1, depth)
+    rest = line[m.end():].strip()
+
+    if _ROMAN_MARKER.match(token):        # I.  II.  III.   -> top level
+        depth = 1
+    elif _LETTER_MARKER.match(token):     # A.  B.  C.      -> subsection
+        depth = 2
+    elif _PAREN_NUMBER.match(token):      # 1)  2)  (3)     -> point in a list
+        depth = 3
+    else:                                 # 3 / 3. / 3.1 / 3.1.2
+        depth = len([p for p in token.strip("().").split(".") if p])
+
+    return rest, True, max(1, depth)
 
 
 def classify_heading(line: str) -> Tuple[Optional[str], int]:

@@ -1,11 +1,17 @@
-# AVANTI dependencies. Pinned so every machine resolves the same versions.
-# Install with:  python -m venv .venv && .venv/Scripts/pip install -r requirements.txt
+# Engine + HTTP API. This is what a deployment installs.
+# Pinned so every machine resolves the same versions.
+#
+#   python -m venv .venv
+#   .venv/Scripts/pip install -r requirements.txt
 
-streamlit==1.63.0          # UI framework
-pdfplumber==0.11.10        # primary PDF text extraction (best on multi-column)
+# --- analysis engine ---
+pdfplumber==0.11.10        # layout-aware PDF text extraction
 pypdf==6.18.0              # fallback PDF reader
-scikit-learn==1.9.1        # TF-IDF + cosine similarity for offline summaries
+scikit-learn==1.9.1        # TF-IDF + cosine similarity
 feedparser==6.0.14         # parses the arXiv Atom feed
 requests==2.34.2           # HTTP: arXiv + Gemini
 
-# PyPDF2 was removed: it is deprecated and superseded by pypdf above.
+# --- HTTP API ---
+fastapi==0.143.0
+uvicorn[standard]==0.52.4
+python-multipart==0.0.32   # multipart file uploads

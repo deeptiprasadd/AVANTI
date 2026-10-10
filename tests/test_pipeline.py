@@ -48,6 +48,44 @@ def test_numbering_depth_is_reported():
     assert sections.classify_heading("3.1 Encoder and Decoder Stacks")[1] == 2
 
 
+def test_depth_follows_marker_style_not_dot_count():
+    """IEEE papers nest by marker style, and all of these have one dot.
+
+    Roman numerals are top-level sections, letters are subsections, and
+    "1)" marks a point inside one. Counting dots made all three depth 1,
+    which promoted every subsection and bullet into its own section.
+    """
+    assert sections.classify_heading("II. RELATED WORK")[1] == 1
+    assert sections.classify_heading("A. Econometric based methods")[1] == 2
+    assert sections.classify_heading("1) Inventory data for stock-outs")[1] == 3
+
+
+def test_ieee_subsections_do_not_become_sections():
+    text = "\n".join([
+        "I. INTRODUCTION",
+        "Price elasticity measures how demand responds to a change in price.",
+        "II. RELATED WORK",
+        "Earlier studies rely on econometric models of consumer behaviour.",
+        "A. Econometric based methods",
+        "These approaches estimate demand curves from historical sales data.",
+        "B. Machine-learning based methods",
+        "More recent work applies gradient boosting to the same problem.",
+        "1) Inventory data to account for stock-outs",
+        "Stock-outs distort the observed demand signal considerably.",
+        "III. CONCLUSION",
+        "The proposed approach outperforms the econometric baselines tested.",
+    ])
+    paper = sections.analyze(text)
+    labels = [s.label for s in paper.sections]
+
+    assert "RELATED WORK" in labels
+    assert "CONCLUSION" in labels
+    # Subsections and list points stay inside their parent.
+    assert "Econometric based methods" not in labels
+    assert "Inventory data to account for stock-outs" not in labels
+    assert len(paper.sections) <= 4
+
+
 def test_subsections_do_not_split_their_parent():
     """An unrecognized subsection belongs to the section containing it."""
     text = "\n".join([

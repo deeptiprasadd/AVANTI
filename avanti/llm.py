@@ -41,16 +41,35 @@ Get a key at https://aistudio.google.com/apikey
 MAX_CHARS = 60_000
 
 
-def get_key() -> str:
-    """The Gemini API key from Streamlit secrets or the environment."""
-    key = ""
-    try:
-        import streamlit as st
+# Where a key may live, in priority order. The secrets file is parsed
+# directly rather than through Streamlit, so the engine has no UI framework
+# dependency at all and can be imported by any server.
+SECRETS_PATH = os.path.join(".streamlit", "secrets.toml")
 
-        key = st.secrets.get("GEMINI_API_KEY", "")  # raises with no secrets file
-    except Exception:
-        key = ""
-    return (key or os.environ.get("GEMINI_API_KEY", "")).strip()
+_KEY_LINE = re.compile(
+    r"""^\s*GEMINI_API_KEY\s*=\s*["']?([^"'\s#]+)["']?""", re.M
+)
+
+
+def _key_from_file(path: str = SECRETS_PATH) -> str:
+    """Read GEMINI_API_KEY out of a secrets.toml, if one exists."""
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            match = _KEY_LINE.search(fh.read())
+    except (OSError, UnicodeDecodeError):
+        return ""
+    if not match:
+        return ""
+    value = match.group(1).strip()
+    # Ignore the placeholder shipped in secrets.toml.example.
+    return "" if value.startswith("paste-your-key") else value
+
+
+def get_key() -> str:
+    """The Gemini API key, from the environment or a local secrets file."""
+    return (
+        os.environ.get("GEMINI_API_KEY", "").strip() or _key_from_file()
+    ).strip()
 
 
 def has_key() -> bool:
