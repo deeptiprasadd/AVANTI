@@ -135,4 +135,4 @@ def test_ocr_without_engine_returns_install_hint(monkeypatch):
     monkeypatch.setattr(ocr, "available", lambda: False)
     result = ocr.ocr_pdf(b"%PDF-1.4 not really a pdf", max_pages=1)
     assert result.pages == []
-    assert any("requirements-ocr" in w for w in result.warnings)
+    assert any("rapidocr" in w for w in result.warnings)

@@ -22,15 +22,18 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends curl \
  && rm -rf /var/lib/apt/lists/*
 
-# requirements-ocr.txt pulls in requirements.txt via its own -r line.
-COPY requirements.txt requirements-ocr.txt ./
+COPY requirements.txt ./
 
 # rapidocr depends on opencv-python, which needs libGL and friends that a
 # slim image does not have -- the classic "ImportError: libGL.so.1" on
 # deploy. Swapping in the headless build fixes that and is ~30MB smaller.
 # Left unpinned because the right version tracks whatever rapidocr pulls;
 # pin it once your first build succeeds if you want byte-identical images.
-RUN pip install -r requirements-ocr.txt \
+# Streamlit lives in requirements.txt because Streamlit Community Cloud can
+# only read that one file. The API image has no use for it, nor for the
+# ~190MB of pandas/pyarrow it drags along that the engine never imports.
+RUN pip install -r requirements.txt \
+ && pip uninstall -y streamlit pandas pyarrow altair pydeck \
  && pip uninstall -y opencv-python \
  && pip install opencv-python-headless
 

@@ -1,8 +1,8 @@
-# Engine + HTTP API. This is what a deployment installs.
-# Pinned so every machine resolves the same versions.
+# Everything the app needs to run.
 #
-#   python -m venv .venv
-#   .venv/Scripts/pip install -r requirements.txt
+# One file on purpose: Streamlit Community Cloud always reads
+# requirements.txt from the repo root and cannot be pointed at another
+# name, so splitting it would simply break that deploy.
 
 # --- analysis engine ---
 pdfplumber==0.11.10        # layout-aware PDF text extraction
@@ -11,7 +11,13 @@ scikit-learn==1.9.1        # TF-IDF + cosine similarity
 feedparser==6.0.14         # parses the arXiv Atom feed
 requests==2.34.2           # HTTP: arXiv + Gemini
 
-# --- HTTP API ---
+# --- OCR for scanned PDFs ---
+rapidocr-onnxruntime==1.2.3  # bundles its own models, no Tesseract needed
+
+# --- Streamlit UI (app.py) ---
+streamlit==1.63.0
+
+# --- FastAPI UI (server/, run with uvicorn) ---
 fastapi==0.143.0
 uvicorn[standard]==0.52.4
-python-multipart==0.0.32   # multipart file uploads
+python-multipart==0.0.32

@@ -1,6 +1,0 @@
-# The original Streamlit UI (app.py), kept working during the move to the
-# FastAPI app. Not needed for a deployment -- Streamlit drags in pandas and
-# pyarrow, about 190MB that the engine itself never imports.
--r requirements.txt
-
-streamlit==1.63.0

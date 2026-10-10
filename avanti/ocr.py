@@ -73,7 +73,7 @@ _ENGINE_CONFIG = {
 
 INSTALL_HINT = (
     "OCR needs an extra package. Install it with:\n\n"
-    "    pip install -r requirements-ocr.txt\n\n"
+    "    pip install rapidocr-onnxruntime\n\n"
     "That pulls in rapidocr-onnxruntime, which bundles its own models and "
     "needs no system packages."
 )

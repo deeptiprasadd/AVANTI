@@ -103,15 +103,23 @@ python -m venv .venv
 
 On macOS or Linux use `.venv/bin/` instead of `.venv/Scripts/`.
 
-### Optional: OCR for scanned PDFs
+### OCR for scanned PDFs
+
+Included in `requirements.txt` via `rapidocr-onnxruntime`, which bundles its
+own models and needs no Tesseract install. Budget about ten seconds a page
+on CPU.
+
+On Linux it also needs two system libraries, listed in `packages.txt` —
+without them OpenCV fails to import with `libGL.so.1: cannot open shared
+object file`. Streamlit Community Cloud installs that file automatically;
+elsewhere:
 
 ```bash
-.venv/Scripts/pip install -r requirements-ocr.txt
+sudo apt-get install -y libgl1 libglib2.0-0
 ```
 
-This pulls in `rapidocr-onnxruntime`, which bundles its own models and needs
-no system packages -- notably no Tesseract install. Budget about ten seconds
-per page on CPU.
+To run without OCR, set `AVANTI_ENABLE_OCR=0`. Scanned PDFs are then
+reported rather than read, and everything else is unaffected.
 
 ### Optional: the AI panel
 
@@ -159,8 +167,9 @@ Worth knowing before you trust the output:
 - **OCR is slow and imperfect.** About ten seconds a page on CPU, and it
   recovers text without font information -- so on a scan the title is
   guessed from line length rather than type size, and column detection
-  works from noisier boxes. Install `requirements-ocr.txt` to enable it;
-  without it, a scanned PDF is detected and reported, not silently empty.
+  works from noisier boxes. It can be switched off with
+  `AVANTI_ENABLE_OCR=0`, in which case a scanned PDF is detected and
+  reported rather than silently coming back empty.
 - **Heavy inline math leaves gaps.** Equations are laid out as individually
   positioned glyphs; they're filtered out, so a sentence built around a
   formula can read with pieces missing.

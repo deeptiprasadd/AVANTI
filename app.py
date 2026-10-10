@@ -465,7 +465,10 @@ with tab_analyze:
         if ocr.available():
             st.caption(f"OCR engine: {ocr.backend_label()} -- about 10s per page.")
         else:
-            st.caption("OCR engine: not installed. See requirements-ocr.txt.")
+            st.caption(
+                "OCR engine: not installed. Add rapidocr-onnxruntime to "
+                "requirements.txt to enable it."
+            )
 
     uploaded = st.file_uploader("Drop a PDF here", type=["pdf"],
                                 label_visibility="collapsed")
