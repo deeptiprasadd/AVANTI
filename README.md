@@ -1,5 +1,7 @@
 # AVANTI
 
+**[Try it live →](https://avanti-research-paper-analyzer2025.streamlit.app/)**
+
 A research paper analyzer that reads a PDF the way you would — structure
 first, then the claims, then the numbers.
 
@@ -149,6 +151,9 @@ avanti/
 tests/
   test_pipeline.py     extraction, sections, analysis, summarization
   test_ocr_and_llm.py  OCR reading order, Gemini model selection
+
+requirements.txt       runtime dependencies
+packages.txt           apt packages Streamlit Cloud installs (OpenCV needs these)
 ```
 
 Each stage is a pure function over text, so it can be tested without a PDF
