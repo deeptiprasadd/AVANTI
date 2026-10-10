@@ -29,6 +29,34 @@ _QUESTION_WORDS = {
     "it", "its", "their", "there", "about", "tell", "me", "explain", "describe",
 }
 
+# Words a paper actually uses for what a question asks about. Matching is
+# lexical, and papers rarely echo the question: "What problem does this
+# address?" is answered by "existing methods are limited by..." -- a
+# sentence sharing no words with it. Each question word pulls in its usual
+# answers' vocabulary (both inflections, since nothing here stems).
+_RELATED = {
+    # Not "drawback": a paper's drawbacks are its own limitations, not the
+    # problem it sets out to solve -- that is usually other work's failing.
+    "problem": "challenge challenges limited lack lacks suffer suffers issue "
+               "issues difficult difficulty gap bottleneck existing",
+    "address": "tackle tackles aim aims goal solve focus",
+    "method": "propose proposed introduce introduces present approach "
+              "framework architecture algorithm technique",
+    "model": "propose proposed introduce network architecture framework",
+    "propose": "proposed introduce introduces present approach framework",
+    "datasets": "dataset benchmark benchmarks corpus evaluate evaluated "
+                "trained training",
+    "metrics": "metric accuracy precision recall score f1 auc bleu "
+               "error iou map",
+    "results": "outperform outperforms achieve achieves improve improves "
+               "improvement gain state-of-the-art",
+    "limitations": "limitation limited drawback drawbacks weakness "
+                   "shortcoming fail fails restricted future",
+    "compare": "compared comparison baseline baselines outperform "
+               "outperforms previous existing earlier",
+    "prior": "previous existing earlier baseline baselines",
+}
+
 
 @dataclass
 class Passage:
@@ -113,8 +141,10 @@ class PaperIndex:
         """Strip question scaffolding so content words dominate the match."""
         tokens = re.findall(r"[A-Za-z][A-Za-z\-]+|\d+", question.lower())
         content = [t for t in tokens if t not in _QUESTION_WORDS]
-        # Repeat content words so they outweigh any scaffolding left behind.
-        return " ".join(content * 2) if content else question
+        related = [w for t in content for w in _RELATED.get(t, "").split()]
+        # Repeat the asker's own words so they outweigh both any scaffolding
+        # left behind and the related terms, which only widen the net.
+        return " ".join(content * 2 + related) if content else question
 
 
 def build_index(doc, paper) -> PaperIndex:
