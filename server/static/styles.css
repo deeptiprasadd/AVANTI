@@ -3,8 +3,7 @@
  * Tokens are declared once for light and overridden under
  * [data-theme="dark"], which a script stamps on <html> from the stored
  * preference or the OS setting. Because this page owns its own markup,
- * the theme is always consistent -- unlike the Streamlit version, where
- * the framework picked a theme independently of prefers-color-scheme.
+ * every surface follows the same theme.
  */
 
 :root {

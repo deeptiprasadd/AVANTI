@@ -1,6 +1,11 @@
+# Secrets: never in an image.
+.env
+.streamlit/
+
 .venv/
 .git/
 .github/
+.claude/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -9,10 +14,6 @@ __pycache__/
 tests/
 docs/
 .vscode/
-.devcontainer/
-.streamlit/
-app.py
-requirements.txt
 requirements-dev.txt
 README.md
 *.md

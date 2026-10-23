@@ -1,23 +1,19 @@
-# Everything the app needs to run.
+# Everything the app needs to run: the analysis engine and the HTTP API.
 #
-# Streamlit Community Cloud reads this file from the repo root and
-# cannot be pointed at another name, so everything lives here.
+#   python -m venv .venv
+#   .venv/Scripts/pip install -r requirements.txt
+#
+# OCR for scanned PDFs is a separate, heavier add-on: requirements-ocr.txt.
+# The Docker image (Render) installs that file, which includes this one.
 
 # --- analysis engine ---
 pdfplumber==0.11.10        # layout-aware PDF text extraction
 pypdf==6.18.0              # fallback PDF reader
-scikit-learn==1.9.1        # TF-IDF + cosine similarity
+scikit-learn==1.9.1        # BM25 / TF-IDF retrieval and similarity
 feedparser==6.0.14         # parses the arXiv Atom feed
-requests==2.34.2           # HTTP: arXiv + Gemini
+requests==2.34.2           # HTTP: arXiv, OpenAlex, Europe PMC, Gemini
 
-# NOTE: OCR for scanned PDFs is deliberately NOT installed here.
-# rapidocr-onnxruntime pulls in OpenCV and onnxruntime, about 100MB of
-# wheels -- 41% of the whole install -- and that tips Streamlit Community
-# Cloud's free build over its limit ("Error installing requirements").
-# The app detects its absence and reports scanned PDFs instead of reading
-# them. To enable OCR when running locally:
-#
-#     pip install rapidocr-onnxruntime
-#
-# --- Streamlit UI (app.py) ---
-streamlit==1.63.0
+# --- HTTP API ---
+fastapi==0.143.0
+uvicorn[standard]==0.52.4
+python-multipart==0.0.32   # multipart file uploads

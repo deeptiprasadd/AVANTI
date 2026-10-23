@@ -1,8 +1,8 @@
 """One call from PDF bytes to a complete analysis.
 
-Both front ends -- the Streamlit app and the HTTP API -- run exactly this, so
-a paper reads the same whichever one it is uploaded to, and a new stage is
-added in one place rather than two.
+The HTTP API runs exactly this for every upload, and anything else that wants
+a full analysis -- a script, a notebook, a test -- can call it the same way
+without going through the server.
 """
 
 from __future__ import annotations

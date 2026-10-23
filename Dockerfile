@@ -1,7 +1,6 @@
 # AVANTI -- research paper analyzer.
 #
-# One image serving the API and the web UI. Sized for a free CPU host: no
-# Streamlit, so none of pandas/pyarrow/altair come along.
+# One image serving the API and the web UI, sized for a free CPU host.
 #
 #   docker build -t avanti .
 #   docker run -p 7860:7860 avanti
@@ -22,16 +21,15 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends curl \
  && rm -rf /var/lib/apt/lists/*
 
-# requirements.txt is the Streamlit app's list. The image installs its own,
-# which adds the HTTP API and OCR and leaves Streamlit out.
-COPY requirements-server.txt ./
+# requirements-ocr.txt pulls in requirements.txt via its own -r line.
+COPY requirements.txt requirements-ocr.txt ./
 
 # rapidocr depends on opencv-python, which needs libGL and friends that a
 # slim image does not have -- the classic "ImportError: libGL.so.1" on
 # deploy. Swapping in the headless build fixes that and is ~30MB smaller.
 # Left unpinned because the right version tracks whatever rapidocr pulls;
 # pin it once your first build succeeds if you want byte-identical images.
-RUN pip install -r requirements-server.txt \
+RUN pip install -r requirements-ocr.txt \
  && pip uninstall -y opencv-python \
  && pip install opencv-python-headless
 

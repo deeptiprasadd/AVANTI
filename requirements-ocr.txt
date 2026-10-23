@@ -1,0 +1,11 @@
+# OCR for scanned PDFs, on top of the app itself. The Docker image installs
+# this file; locally it is optional -- without it, a scanned PDF is detected
+# and reported rather than read.
+#
+#   .venv/Scripts/pip install -r requirements-ocr.txt
+#
+# rapidocr-onnxruntime bundles its own models and needs no system packages
+# beyond OpenCV's (see the Dockerfile). Expect about ten seconds a page.
+-r requirements.txt
+
+rapidocr-onnxruntime==1.2.3

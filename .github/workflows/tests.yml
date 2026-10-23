@@ -6,7 +6,7 @@ name: tests
 #   - The token is read-only. The job can read the code and nothing else: it
 #     cannot push, comment, open issues or touch releases.
 #   - No secrets are used, so there is nothing to leak. The Gemini key lives
-#     in the Streamlit and Render dashboards, never in this repository.
+#     in the Render dashboard, never in this repository.
 #   - It runs on `pull_request`, not `pull_request_target`, so a pull request
 #     from someone else's fork gets a read-only token and no secrets.
 #   - Each action is pinned to a full commit hash rather than a tag, so a

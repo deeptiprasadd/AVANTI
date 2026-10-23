@@ -1,8 +1,9 @@
 """Optional Gemini-backed deep analysis.
 
 This is strictly an add-on: the app is fully functional without a key, and
-the UI panel only appears when one is configured. The key is read from
-Streamlit secrets or the environment and never written into source.
+the UI panel only appears when one is configured. The key is read from the
+environment (how Render supplies it) or a local, gitignored `.env` file, and
+is never written into source.
 """
 
 from __future__ import annotations
@@ -28,9 +29,10 @@ _SPECIALIZED = ("tts", "image", "embedding", "vision", "omni", "aqa")
 
 NO_KEY_MESSAGE = """**No API key configured.**
 
-Copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml` and add:
+Set the `GEMINI_API_KEY` environment variable, or copy `.env.example` to
+`.env` and add:
 
-    GEMINI_API_KEY = "your-key-here"
+    GEMINI_API_KEY=your-key-here
 
 Get a key at https://aistudio.google.com/apikey
 """
@@ -41,10 +43,9 @@ Get a key at https://aistudio.google.com/apikey
 MAX_CHARS = 60_000
 
 
-# Where a key may live, in priority order. The secrets file is parsed
-# directly rather than through Streamlit, so the engine has no UI framework
-# dependency at all and can be imported by any server.
-SECRETS_PATH = os.path.join(".streamlit", "secrets.toml")
+# Where a key may live after the environment: a local .env file, parsed
+# here directly so running locally needs no extra package to load it.
+SECRETS_PATH = ".env"
 
 _KEY_LINE = re.compile(
     r"""^\s*GEMINI_API_KEY\s*=\s*["']?([^"'\s#]+)["']?""", re.M
@@ -52,7 +53,7 @@ _KEY_LINE = re.compile(
 
 
 def _key_from_file(path: str = SECRETS_PATH) -> str:
-    """Read GEMINI_API_KEY out of a secrets.toml, if one exists."""
+    """Read GEMINI_API_KEY out of a .env file, if one exists."""
     try:
         with open(path, "r", encoding="utf-8") as fh:
             match = _KEY_LINE.search(fh.read())
@@ -61,8 +62,8 @@ def _key_from_file(path: str = SECRETS_PATH) -> str:
     if not match:
         return ""
     value = match.group(1).strip()
-    # Ignore the placeholder shipped in secrets.toml.example.
-    return "" if value.startswith("paste-your-key") else value
+    # Ignore the placeholder shipped in .env.example.
+    return "" if value.startswith(("paste-your-key", "your-key-here")) else value
 
 
 def get_key() -> str:

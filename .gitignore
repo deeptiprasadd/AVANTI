@@ -1,6 +1,6 @@
 # ---- Secrets: never commit these ----
-.streamlit/secrets.toml
 .env
+.streamlit/
 *.key
 
 # ---- Python ----
@@ -27,9 +27,6 @@ ENV/
 .ipynb_checkpoints/
 .coverage
 htmlcov/
-
-# ---- Streamlit ----
-.streamlit/cache/
 
 # ---- Editors / OS ----
 .vscode/*

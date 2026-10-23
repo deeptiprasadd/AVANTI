@@ -5,14 +5,13 @@
 A research paper analyzer that reads a PDF the way you would: structure
 first, then the claims, then the numbers.
 
-## Live demos
+## Live demo
 
-Two front ends, one shared analysis engine:
+**https://avanti-vxf8.onrender.com**
 
-| Version | Link | Notes |
-|---|---|---|
-| Web app (FastAPI + custom UI) | https://avanti-vxf8.onrender.com | Includes OCR for scanned PDFs. Free tier: the first visit after a quiet spell takes about a minute to wake up. |
-| Streamlit app | https://avanti-research-paper-analyzer2025.streamlit.app/ | No OCR (the free build has no room for it). |
+A FastAPI backend with a hand-built HTML/CSS/JS front end, deployed on
+Render from the Dockerfile in this repository. It is on Render's free tier,
+so the first visit after a quiet spell takes about a minute to wake up.
 
 ## What it does
 
@@ -35,6 +34,7 @@ Two front ends, one shared analysis engine:
   many results you want (up to 50), and analyze any result in one click.
 - **Layout-aware extraction.** Two-column papers are read in the right
   order, and small-caps titles and headings are repaired.
+- **Scanned PDFs.** A PDF with no text layer is read optically (OCR).
 
 Everything runs on the server. No API key is needed. An optional Gemini
 report appears only if a key is configured.
@@ -42,7 +42,7 @@ report appears only if a key is configured.
 ## Project layout
 
 ```
-avanti/      analysis engine (shared by both apps)
+avanti/      analysis engine
   extract     PDF -> layout-correct text, title, authors
   sections    section detection (Abstract, Method, Results, ...)
   analyze     structured findings, metrics, datasets
@@ -55,9 +55,9 @@ avanti/      analysis engine (shared by both apps)
   ocr         optical reading for scanned pages
   llm         optional Gemini report
   pipeline    all of the above in one call
-server/      FastAPI app and the web UI (deployed on Render via Dockerfile)
-app.py       Streamlit app (deployed on Streamlit Community Cloud)
+server/      FastAPI app and the web UI (server/static)
 tests/       pytest suite, run on every push by GitHub Actions
+Dockerfile   the image Render builds; render.yaml configures the service
 ```
 
 ## Run locally
@@ -66,13 +66,19 @@ tests/       pytest suite, run on every push by GitHub Actions
 python -m venv .venv
 .venv/Scripts/pip install -r requirements-dev.txt
 .venv/Scripts/python -m pytest -q
-.venv/Scripts/streamlit run app.py                         # Streamlit app
-.venv/Scripts/python -m uvicorn server.main:app --reload   # web app
+.venv/Scripts/python -m uvicorn server.main:app --reload
 ```
 
-Dependencies: `requirements.txt` is for Streamlit Cloud,
-`requirements-server.txt` is for the Docker image (adds the API and OCR),
-and `requirements-dev.txt` is for development and CI.
+Then open http://localhost:8000. Or run exactly what Render runs:
+
+```
+docker build -t avanti .
+docker run -p 7860:7860 avanti
+```
+
+Dependencies: `requirements.txt` is the app itself, `requirements-ocr.txt`
+adds OCR (the Docker image installs it), and `requirements-dev.txt` adds
+the test tools.
 
 ## Security notes
 
@@ -183,16 +189,15 @@ commands above.
 
 ### OCR for scanned PDFs
 
-The Render web app includes OCR. The Streamlit app does not, and this is
-deliberate: `rapidocr-onnxruntime` pulls in OpenCV and onnxruntime, about
-100MB of wheels and 41% of the entire install, enough to push Streamlit
-Community Cloud's free build past its limit. Without it the app detects a
-scanned PDF and reports it rather than failing on it.
+The Docker image (and so the live demo) includes OCR. Locally it is
+optional, because `rapidocr-onnxruntime` pulls in OpenCV and onnxruntime,
+about 100MB of wheels. Without it the app detects a scanned PDF and reports
+it rather than failing on it.
 
 To enable it locally:
 
 ```bash
-.venv/Scripts/pip install rapidocr-onnxruntime
+.venv/Scripts/pip install -r requirements-ocr.txt
 ```
 
 On Linux it also needs two system libraries, or OpenCV fails to import with
@@ -209,12 +214,12 @@ speed.
 ### Optional: the AI panel
 
 ```bash
-cp .streamlit/secrets.toml.example .streamlit/secrets.toml
+cp .env.example .env
 ```
 
 Then paste a key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-into that file. It is gitignored and must never be committed. On Render,
-set `GEMINI_API_KEY` in the service's environment settings instead.
+into `.env`. It is gitignored and must never be committed. On Render, set
+`GEMINI_API_KEY` in the service's Environment settings instead.
 
 ---
 
