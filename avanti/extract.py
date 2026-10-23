@@ -262,14 +262,20 @@ def _page_lines(
     body_size: float,
     drop_junk: bool = True,
     exclude_tables: bool = True,
+    regions: Optional[List[Tuple[float, float, float, float]]] = None,
 ) -> Tuple[List[str], bool]:
-    """One page's lines in true reading order. Returns (lines, two_column)."""
+    """One page's lines in true reading order. Returns (lines, two_column).
+
+    A `body_size` of 0 keeps text of every size. `regions` passes in table
+    regions already found, so a second pass over the page skips that work.
+    """
     if not words:
         return [], False
 
     # Drop words inside tables: their cells flatten into fake sentences.
     if exclude_tables:
-        regions = _table_regions(page)
+        if regions is None:
+            regions = _table_regions(page)
         if regions:
             words = [w for w in words if not _in_any_region(w, regions)]
             if not words:
@@ -340,6 +346,68 @@ _ABSTRACT_LINE = re.compile(r"^\s*(abstract|summary)\b", re.I)
 _EMAIL = re.compile(r"[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}")
 
 
+def _size_of(word: dict) -> float:
+    return round(word.get("size", 0) * 2) / 2
+
+
+def _looks_small_caps(title: str) -> bool:
+    """"A : A M S O" -- mostly lone capitals, the initials of small caps."""
+    tokens = [t for t in title.split() if t.isalpha()]
+    singles = sum(1 for t in tokens if len(t) == 1 and t.isupper())
+    return singles >= 2 and singles >= 0.4 * max(1, len(tokens))
+
+
+def _title_on_baselines(head: List[dict], title_words: List[dict],
+                        body_size: float) -> str:
+    """Rebuild a small-caps title from every word on the title's baselines.
+
+    Small caps set each word's first letter at full size and the rest
+    smaller, on the same baseline: "ADAM" is an "A" and a smaller "DAM".
+    Lines are normally grouped by their top edge, which differs between the
+    two sizes, so reading only the largest size gave "A : A M S O".
+    Fragments that touch are rejoined into one word.
+    """
+    baselines = sorted({round(w["bottom"], 1) for w in title_words})
+    lines: dict = {}
+    for w in head:
+        if w.get("size", 0) < body_size * 1.05:
+            continue
+        near = [b for b in baselines if abs(w["bottom"] - b) <= 1.5]
+        if near:
+            lines.setdefault(near[0], []).append(w)
+
+    out = []
+    for base in sorted(lines):
+        ws = sorted(lines[base], key=lambda w: w["x0"])
+        text = ws[0]["text"]
+        for prev, w in zip(ws, ws[1:]):
+            # A word space is about a quarter of the type size; the seam
+            # between a capital and its small caps is a fraction of that.
+            touching = w["x0"] - prev["x1"] < 0.12 * prev.get("size", 10)
+            text += ("" if touching else " ") + w["text"]
+        out.append(text)
+    return " ".join(out)
+
+
+# Small-caps headings extract with the first letter split off: "A BSTRACT".
+_SMALL_CAPS = re.compile(r"\b([A-Z]) (?=[A-Z]{2,}\b)")
+
+
+def _is_author_line(line: str) -> bool:
+    """Names and affiliations, not a figure label that sits near the top.
+
+    A name line is mostly capitalized words; "NA / DiNA (dilation = 1)" is
+    a figure's legend.
+    """
+    if "=" in line:
+        return False
+    tokens = [t for t in line.split() if any(c.isalpha() for c in t)]
+    if not tokens:
+        return False
+    capitalized = sum(1 for t in tokens if t.lstrip("(\"'")[:1].isupper())
+    return capitalized >= 0.6 * len(tokens)
+
+
 def _extract_title_and_authors(page, words: List[dict], body_size: float):
     """Read title and authors from font sizes on the first page."""
     if not words:
@@ -352,18 +420,19 @@ def _extract_title_and_authors(page, words: List[dict], body_size: float):
 
     sizes = sorted({round(w.get("size", 0) * 2) / 2 for w in head}, reverse=True)
 
-    title, title_size = "", None
+    title, title_size, title_words = "", None, []
     for size in sizes:
-        at_size = [
-            w for w in head if abs(round(w.get("size", 0) * 2) / 2 - size) < 0.25
-        ]
+        at_size = [w for w in head if abs(_size_of(w) - size) < 0.25]
         text = " ".join(_group_into_lines(at_size)).strip()
         n_words = len(text.split())
         # Bigger than body text, and a plausible title length -- this skips a
         # single huge word (a journal logo) and the body text itself.
         if size > body_size * 1.12 and 3 <= n_words <= 40:
-            title, title_size = text, size
+            title, title_size, title_words = text, size, at_size
             break
+
+    if title_words and _looks_small_caps(title):
+        title = _title_on_baselines(head, title_words, body_size) or title
 
     if not title:
         for ln in _group_into_lines(head):
@@ -372,23 +441,27 @@ def _extract_title_and_authors(page, words: List[dict], body_size: float):
                 break
 
     # Authors: text below the title, above the abstract, at least body size.
+    # "Below" is literal -- a licence notice or a running head printed above
+    # the title is not an author line.
     authors: List[str] = []
     if title_size is not None:
+        title_bottom = max(w["bottom"] for w in title_words)
         below = [
             w
             for w in head
-            if round(w.get("size", 0) * 2) / 2 < title_size - 0.25
+            if _size_of(w) < title_size - 0.25
             and w.get("size", 0) >= body_size * 0.9
+            and w["top"] > title_bottom
         ]
         for ln in _group_into_lines(below):
-            if _ABSTRACT_LINE.match(ln):
+            if _ABSTRACT_LINE.match(_SMALL_CAPS.sub(r"\1", ln)):
                 break
             ln = _EMAIL.sub("", ln).strip(" ,;")
             # Removing an email or a superscript marker can leave a gap
             # before the separating comma ("Ali Hassani , Humphrey Shi").
             ln = re.sub(r"\s+([,;])", r"\1", ln)
             ln = re.sub(r"\s{2,}", " ", ln)
-            if ln and not is_junk_line(ln):
+            if ln and not is_junk_line(ln) and _is_author_line(ln):
                 authors.append(ln)
 
     return clean_glyphs(title), [clean_glyphs(a) for a in authors[:6]]
@@ -413,10 +486,21 @@ class Document:
     backend: str = ""
     warnings: List[str] = field(default_factory=list)
 
+    # Every page again with small print kept. `pages` drops text smaller
+    # than the body, which is right for analysis but takes the bibliography
+    # with it -- most papers set their references a size down. Only the
+    # reference parser reads this.
+    full_pages: List[str] = field(default_factory=list)
+
     @property
     def text(self) -> str:
         """All pages joined, with form feeds marking page boundaries."""
         return "\f".join(self.pages)
+
+    @property
+    def full_text(self) -> str:
+        """Like `text`, small print included. Falls back to `text`."""
+        return "\f".join(self.full_pages) if self.full_pages else self.text
 
     @property
     def word_count(self) -> int:
@@ -562,9 +646,19 @@ def _extract_pdfplumber(
         doc.body_font_size = document_body_size(per_page_words)
 
         raw_pages: List[List[str]] = []
+        full_pages: List[List[str]] = []
         for i, (page, words) in enumerate(zip(pages, per_page_words)):
-            lines, two_col = _page_lines(page, words, doc.body_font_size)
+            regions = _table_regions(page)
+            lines, two_col = _page_lines(
+                page, words, doc.body_font_size, regions=regions
+            )
             raw_pages.append(lines)
+            # Junk lines are kept too: "arXiv:1607.06450, 2016." is mostly
+            # digits and reads as an equation fragment to the junk filter.
+            full_pages.append(
+                _page_lines(page, words, 0.0, drop_junk=False,
+                            regions=regions)[0]
+            )
             doc.tables.extend(extract_tables(page))
             if two_col:
                 doc.two_column_pages += 1
@@ -575,6 +669,9 @@ def _extract_pdfplumber(
 
     raw_pages = _strip_running_heads(raw_pages)
     doc.pages = [_clean_page(lines) for lines in raw_pages]
+    doc.full_pages = [
+        _clean_page(lines) for lines in _strip_running_heads(full_pages)
+    ]
     doc.pages_processed = len(doc.pages)
 
     # A sparse text layer is not warned about here: extract() checks for it

@@ -2,7 +2,8 @@
 
 A single clean surface: drop in a PDF, get a structured read-out of what the
 paper claims, what it measured, and what it admits it cannot do -- then ask
-the paper questions and get answers cited to a page.
+the paper questions and get answers cited to a page, see which prior work
+it leans on, and compare it with another paper side by side.
 
 Everything runs locally. The Gemini deep-analysis panel appears only when an
 API key is configured; without one the app is fully functional offline.
@@ -10,13 +11,17 @@ API key is configured; without one the app is fully functional offline.
 
 from __future__ import annotations
 
+import csv
 import hashlib
+import html
+import io
 import time
 
 import requests
 import streamlit as st
 
-from avanti import analyze, extract, llm, ocr, qa, sections, sources, summarize
+from avanti import compare, llm, ocr, pipeline, qa, references, sources
+from avanti.pipeline import Analysis
 
 st.set_page_config(
     page_title="AVANTI",
@@ -152,13 +157,47 @@ st.markdown(
         color: inherit; opacity: 0.58; font-size: 0.87rem; font-style: italic;
         margin: 0.3rem 0 0.2rem 0;
       }
+
+      /* ---------- references ---------- */
+      .ref {
+        border-bottom: 1px solid var(--rule); padding: 0.55rem 0;
+        font-size: 0.9rem; line-height: 1.5; color: inherit;
+      }
+      .ref-num { opacity: 0.55; font-variant-numeric: tabular-nums; }
+      .ref-title { font-weight: 600; }
+      .ref-meta { opacity: 0.62; font-size: 0.8rem; }
+      .ref a, .cmp a { color: var(--accent); text-decoration: none; }
+      .count {
+        display: inline-block; margin-left: 0.4rem; padding: 0.02rem 0.45rem;
+        border-radius: 999px; background: var(--accent-soft);
+        color: var(--accent); font-size: 0.72rem; font-weight: 700;
+      }
+
+      /* ---------- compare ---------- */
+      .cmp-head {
+        font-weight: 700; font-size: 1rem; line-height: 1.35; color: inherit;
+      }
+      .cmp-sub { opacity: 0.62; font-size: 0.82rem; margin-top: 0.15rem; }
+      .chip.shared {
+        border-color: var(--accent-line); background: var(--accent-soft);
+        color: var(--accent); font-weight: 600;
+      }
+      .source-tag {
+        display: inline-block; font-size: 0.68rem; font-weight: 700;
+        letter-spacing: 0.06em; text-transform: uppercase;
+        color: var(--accent); margin-right: 0.35rem;
+      }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
+# Only promise scanned PDFs where OCR is actually installed -- it is not on
+# Streamlit Community Cloud, whose free build cannot fit the OCR engine.
+_SCANS = " Scanned PDFs included." if ocr.available() else ""
+
 st.markdown(
-    """
+    f"""
     <div class="brand">
       <div class="brand-mark">A</div>
       <div>
@@ -169,7 +208,7 @@ st.markdown(
     <div class="brand-rule"></div>
     <p class="brand-tagline">
       Reads a paper the way you would &mdash; structure first, then the
-      claims, then the numbers. Scanned PDFs included.
+      claims, then the numbers.{_SCANS}
     </p>
     """,
     unsafe_allow_html=True,
@@ -178,42 +217,28 @@ st.markdown(
 
 # --------------------------------------------------------------- pipeline
 
-
-class Analysis:
-    """Everything we derived from one PDF, held together for the session."""
-
-    def __init__(self, doc, paper, brief, summary, index):
-        self.doc = doc
-        self.paper = paper
-        self.brief = brief
-        self.summary = summary
-        self.index = index
+# Papers kept in the session at once. Each holds its text and question
+# index; a handful is plenty to compare, and bounds memory on a small host.
+MAX_LIBRARY = 4
 
 
-def run_pipeline(
-    data: bytes,
-    max_pages: int,
-    target_words: int,
-    ocr_mode: str = "auto",
-    ocr_progress=None,
-) -> Analysis:
-    """Extract, segment, summarize and index a PDF."""
-    doc = extract.extract(
-        data,
-        max_pages=max_pages,
-        ocr_mode=ocr_mode,
-        ocr_progress=ocr_progress,
-    )
-    paper = sections.analyze(doc.text)
-    section_map = {s.name: s.text for s in paper.sections}
+def esc(value) -> str:
+    """Escape text from a PDF before it goes into HTML.
 
-    def page_lookup(sentence: str) -> int:
-        return doc.page_of_offset(doc.text.find(sentence[:60]))
+    Paper text is untrusted input, and it is also just text: "p < 0.05" must
+    render as characters, not as the start of a tag.
+    """
+    return html.escape(str(value), quote=True)
 
-    brief = analyze.brief(paper.body, section_map, page_lookup)
-    summary = summarize.summarize_paper(paper, target_words=target_words)
-    index = qa.build_index(doc, paper)
-    return Analysis(doc, paper, brief, summary, index)
+
+def library() -> dict:
+    """Analyzed papers, oldest first: key -> {"name", "analysis", "elapsed"}."""
+    return st.session_state.setdefault("library", {})
+
+
+def current() -> Analysis | None:
+    entry = library().get(st.session_state.get("key"))
+    return entry["analysis"] if entry else None
 
 
 def load(
@@ -223,46 +248,50 @@ def load(
     target_words: int,
     ocr_mode: str = "auto",
 ) -> bool:
-    """Analyze a PDF and store it in the session.
+    """Analyze a PDF, add it to the library and make it the current paper.
 
-    Returns True if a new analysis was run, False if this exact PDF and
-    settings were already loaded.
+    Returns False without doing anything if this exact PDF and these
+    settings are already in the library -- the uploader re-submits its file
+    on every rerun, and that must not re-analyze it or switch back to it.
     """
     key = (
         hashlib.sha256(data).hexdigest()[:16]
         + f"-{max_pages}-{target_words}-{ocr_mode}"
     )
-    if st.session_state.get("key") == key:
+    if key in library():
         return False
 
     t0 = time.time()
     status = st.empty()
-    bar = st.empty()
+    bar = st.progress(0.0)
 
-    def on_ocr_page(done: int, total: int) -> None:
+    def on_progress(stage: str, fraction: float, detail: str) -> None:
         # OCR runs at roughly ten seconds a page, so silent progress would
-        # look like a hang. Report it.
-        status.caption(
-            f"No text layer found -- reading page {done} of {total} "
-            f"optically ({ocr.backend_label()})."
-        )
-        bar.progress(done / max(1, total))
+        # look like a hang. Report every stage.
+        status.caption(detail)
+        bar.progress(min(1.0, fraction))
 
     with st.spinner("Reading the paper..."):
-        st.session_state.analysis = run_pipeline(
-            data, max_pages, target_words,
-            ocr_mode=ocr_mode, ocr_progress=on_ocr_page,
+        analysis = pipeline.run(
+            data,
+            max_pages=max_pages,
+            target_words=target_words,
+            ocr_mode=ocr_mode,
+            progress=on_progress,
         )
     status.empty()
     bar.empty()
+
+    lib = library()
+    lib[key] = {"name": name, "analysis": analysis, "elapsed": time.time() - t0}
+    while len(lib) > MAX_LIBRARY:
+        lib.pop(next(iter(lib)))
     st.session_state.key = key
-    st.session_state.name = name
-    st.session_state.elapsed = time.time() - t0
     st.session_state.question = ""
     return True
 
 
-def settings() -> tuple[int, int]:
+def settings() -> tuple[int, int, str]:
     """The current Options values, remembered across reruns.
 
     The search tab needs these too, but they are rendered in the analyze
@@ -275,12 +304,30 @@ def settings() -> tuple[int, int]:
     )
 
 
+def paper_name(key: str) -> str:
+    entry = library()[key]
+    title = entry["analysis"].doc.title or entry["name"]
+    return title if len(title) <= 70 else title[:67] + "..."
+
+
 # ------------------------------------------------------------- rendering
 
 
 def label(text: str) -> None:
     """A small uppercase group heading."""
-    st.markdown(f'<p class="group-label">{text}</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="group-label">{esc(text)}</p>', unsafe_allow_html=True)
+
+
+def finding_html(text: str, page=None) -> str:
+    cite = f' <span class="cite">p.{esc(page)}</span>' if page else ""
+    return f'<div class="finding">{esc(text)}{cite}</div>'
+
+
+def chips(items, shared=frozenset()) -> str:
+    return " ".join(
+        f'<span class="chip{" shared" if i.lower() in shared else ""}">{esc(i)}</span>'
+        for i in items
+    )
 
 
 def render_findings(title: str, findings, empty: str = "") -> None:
@@ -288,15 +335,14 @@ def render_findings(title: str, findings, empty: str = "") -> None:
     if not findings:
         if empty:
             label(title)
-            st.markdown(f'<p class="empty-note">{empty}</p>',
+            st.markdown(f'<p class="empty-note">{esc(empty)}</p>',
                         unsafe_allow_html=True)
         return
     label(title)
-    for f in findings:
-        cite = f' <span class="cite">p.{f.page}</span>' if f.page else ""
-        st.markdown(
-            f'<div class="finding">{f.text}{cite}</div>', unsafe_allow_html=True
-        )
+    st.markdown(
+        "".join(finding_html(f.text, f.page) for f in findings),
+        unsafe_allow_html=True,
+    )
 
 
 def render_brief(a: Analysis) -> None:
@@ -310,23 +356,21 @@ def render_brief(a: Analysis) -> None:
     if b.metrics:
         label("Reported results")
         boxes = "".join(
-            f'<div class="metric-box"><div class="metric-name">{m.name}</div>'
-            f'<div class="metric-val">{m.value}{m.unit}</div></div>'
+            f'<div class="metric-box"><div class="metric-name">{esc(m.name)}</div>'
+            f'<div class="metric-val">{esc(m.value)}{esc(m.unit)}</div></div>'
             for m in b.metrics[:8]
         )
         st.markdown(f'<div class="metric-row">{boxes}</div>',
                     unsafe_allow_html=True)
         with st.expander("Where these numbers come from"):
-            for m in b.metrics[:10]:
-                page = f" (p.{m.page})" if m.page else ""
-                st.markdown(f"- **{m.name} {m.value}{m.unit}**{page} -- {m.sentence}")
+            st.markdown(
+                "".join(finding_html(m.sentence, m.page) for m in b.metrics[:10]),
+                unsafe_allow_html=True,
+            )
 
     if b.datasets:
         label("Data used")
-        st.markdown(
-            " ".join(f'<span class="chip">{d}</span>' for d in b.datasets),
-            unsafe_allow_html=True,
-        )
+        st.markdown(chips(b.datasets), unsafe_allow_html=True)
 
     render_findings("Stated limitations", b.limitation,
                     "The paper states no explicit limitations.")
@@ -343,11 +387,10 @@ def render_ask(a: Analysis) -> None:
 
     # Suggestions render before the input on purpose: writing to a keyed
     # widget's state is only allowed before that widget is created. Doing it
-    # here means a click fills the box and answers in the same run -- no
-    # explicit rerun, which would otherwise reset the pane selection.
+    # here means a click fills the box and answers in the same run.
     cols = st.columns(2)
     for i, suggestion in enumerate(qa.suggested_questions(a.paper)):
-        if cols[i % 2].button(suggestion, key=f"sug{i}", use_container_width=True):
+        if cols[i % 2].button(suggestion, key=f"sug{i}", width="stretch"):
             st.session_state.question = suggestion
 
     # A keyed widget owns its own state, so anything typed here survives the
@@ -365,10 +408,10 @@ def render_ask(a: Analysis) -> None:
         for ans in answers:
             where = f"p.{ans.page}"
             if ans.section:
-                where += f" &middot; {ans.section}"
+                where += f" · {ans.section}"
             st.markdown(
-                f'<div class="finding">{ans.text}'
-                f'<br><span class="cite">{where}</span></div>',
+                f'<div class="finding">{esc(ans.text)}'
+                f'<br><span class="cite">{esc(where)}</span></div>',
                 unsafe_allow_html=True,
             )
 
@@ -379,14 +422,15 @@ def render_summary(a: Analysis) -> None:
 
     if s.key_points:
         label("Key points")
-        for point in s.key_points:
-            st.markdown(f'<div class="finding">{point}</div>',
-                        unsafe_allow_html=True)
+        st.markdown(
+            "".join(finding_html(point) for point in s.key_points),
+            unsafe_allow_html=True,
+        )
         st.markdown("")
 
     if s.abstract:
         with st.expander("Abstract (as published)"):
-            st.write(s.abstract)
+            st.text(s.abstract)
 
     if not s.sections:
         st.info("Not enough structured text to summarize by section.")
@@ -395,17 +439,143 @@ def render_summary(a: Analysis) -> None:
     label("By section")
     for sec in s.sections:
         with st.expander(f"{sec.label}  ({sec.source_words:,} words → {sec.word_count})"):
-            st.write(sec.text)
+            st.text(sec.text)
+
+
+def reference_html(r: references.Reference, show_count: bool = False) -> str:
+    num = f'<span class="ref-num">[{r.number}]</span> ' if r.number else ""
+    title = r.title or r.text[:160]
+    meta = ", ".join(x for x in (r.authors[:140], str(r.year or "")) if x)
+    link = (
+        f'<a href="{esc(r.url)}" target="_blank" rel="noopener">'
+        f'{"arXiv" if r.arxiv_id and not r.doi else "DOI"}</a>'
+        if r.url
+        else f'<a href="{esc(r.search_url)}" target="_blank" rel="noopener">Find</a>'
+    )
+    count = (
+        f'<span class="count">cited {r.cited}x</span>'
+        if show_count and r.cited else ""
+    )
+    return (
+        f'<div class="ref">{num}<span class="ref-title">{esc(title)}</span>{count}'
+        f'<br><span class="ref-meta">{esc(meta)} &middot; {link}</span></div>'
+    )
+
+
+def references_csv(refs) -> str:
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(["number", "authors", "title", "year", "cited_in_text", "link"])
+    for r in refs:
+        writer.writerow([r.number or "", r.authors, r.title, r.year or "",
+                         r.cited, r.url or r.search_url])
+    return out.getvalue()
+
+
+def render_references(a: Analysis) -> None:
+    """The bibliography, and which of it the paper leans on most."""
+    refs = a.references
+    if not refs:
+        st.info(
+            "No reference list was found in the pages that were read. If the "
+            "paper is long, raise *Pages to read* under Options -- the "
+            "bibliography is usually at the end."
+        )
+        return
+
+    top = references.most_cited(refs)
+    if top:
+        label("Most cited in the text")
+        st.caption("The prior work this paper builds on, by how often it is cited.")
+        st.markdown("".join(reference_html(r, True) for r in top),
+                    unsafe_allow_html=True)
+
+    label(f"All references ({len(refs)})")
+    needle = st.text_input(
+        "Filter references", key="ref_filter",
+        placeholder="author, title or year", label_visibility="collapsed",
+    ).strip().lower()
+    shown = [r for r in refs if not needle or needle in r.text.lower()]
+    if not shown:
+        st.caption("No reference matches that filter.")
+    st.markdown("".join(reference_html(r, True) for r in shown[:250]),
+                unsafe_allow_html=True)
+    st.download_button(
+        "References (.csv)", references_csv(refs),
+        file_name="avanti-references.csv", mime="text/csv",
+    )
+
+
+def render_more(a: Analysis) -> None:
+    if a.brief.phrases:
+        label("Key phrases")
+        st.markdown(chips(a.brief.phrases), unsafe_allow_html=True)
+
+    if a.doc.tables:
+        label("Tables found")
+        for i, table in enumerate(a.doc.tables[:6], start=1):
+            with st.expander(f"Table {i} ({len(table)} rows)"):
+                header, *rows = table
+                if rows:
+                    st.dataframe(
+                        [dict(zip(header, r)) for r in rows],
+                        width="stretch",
+                    )
+                else:
+                    st.write(table)
+
+    label("Downloads")
+    d1, d2 = st.columns(2)
+    d1.download_button(
+        "Summary (.md)",
+        a.summary.full_text,
+        file_name="avanti-summary.md",
+        width="stretch",
+    )
+    d2.download_button(
+        "Extracted text (.txt)",
+        a.doc.text,
+        file_name="avanti-text.txt",
+        width="stretch",
+    )
+
+    with st.expander("Extracted text (what the analysis actually read)"):
+        st.text(a.doc.text[:60000])
+
+    # Optional AI panel: only shown when a key is configured, so the app
+    # stays uncluttered for offline use.
+    if llm.has_key():
+        st.divider()
+        label("AI deep analysis (Gemini)")
+        tone = st.selectbox(
+            "Style", ["Professional", "Academic", "Plain English"]
+        )
+        if st.button("Generate AI report"):
+            with st.spinner("Asking Gemini..."):
+                report = llm.deep_analysis(a.paper.body, a.doc.title, tone)
+            st.markdown(report)
+            st.download_button(
+                "Download AI report (.md)", report,
+                file_name="avanti-ai-report.md",
+            )
+    else:
+        st.divider()
+        st.caption(
+            "Optional: add a Gemini key to `.streamlit/secrets.toml` "
+            "for an AI-written report. Everything above works without one."
+        )
 
 
 def render_paper_header(a: Analysis) -> None:
     doc = a.doc
-    title = doc.title or st.session_state.get("name", "Untitled")
-    st.markdown(f'<div class="paper-title">{title}</div>', unsafe_allow_html=True)
+    entry = library()[st.session_state.key]
+    title = doc.title or entry["name"] or "Untitled"
+    st.markdown(f'<div class="paper-title">{esc(title)}</div>',
+                unsafe_allow_html=True)
 
     if doc.author_lines:
         st.markdown(
-            f'<div class="paper-authors">{doc.author_lines[0][:160]}</div>',
+            f'<div class="paper-authors">{esc(doc.author_lines[0][:160])}</div>',
             unsafe_allow_html=True,
         )
 
@@ -413,7 +583,7 @@ def render_paper_header(a: Analysis) -> None:
     # An OCR'd document is flagged first: it tells the reader why the text
     # may be imperfect, which changes how much to trust the read-out.
     if doc.used_ocr:
-        pills.append(('Read by OCR', True))
+        pills.append(("Read by OCR", True))
     pills += [
         (f"{doc.pages_processed} of {doc.page_count} pages", False),
         (doc.layout, False),
@@ -422,12 +592,14 @@ def render_paper_header(a: Analysis) -> None:
     ]
     if doc.tables:
         pills.append((f"{len(doc.tables)} tables", False))
-    pills.append((f"{st.session_state.get('elapsed', 0):.1f}s", False))
+    if a.references:
+        pills.append((f"{len(a.references)} references", False))
+    pills.append((f"{entry['elapsed']:.1f}s", False))
 
     st.markdown(
         '<div class="meta-row">'
         + "".join(
-            f'<span class="meta-pill{" accent" if hot else ""}">{text}</span>'
+            f'<span class="meta-pill{" accent" if hot else ""}">{esc(text)}</span>'
             for text, hot in pills
         )
         + "</div>",
@@ -438,191 +610,253 @@ def render_paper_header(a: Analysis) -> None:
         st.warning(warning)
 
 
-# ------------------------------------------------------------------- tabs
+def render_compare() -> None:
+    """Two papers from the library, side by side."""
+    lib = library()
+    if len(lib) < 2:
+        st.info(
+            "Analyze two papers -- upload them, or use **Find papers** -- and "
+            "compare them here: problem, method, data and results side by "
+            "side, plus the prior work both build on."
+        )
+        if lib:
+            st.caption(f"In this session so far: {paper_name(next(iter(lib)))}")
+        return
 
-tab_analyze, tab_find = st.tabs(["Analyze a paper", "Find papers"])
+    keys = list(lib)
+    first = st.session_state.get("key") if st.session_state.get("key") in lib else keys[0]
+    c1, c2 = st.columns(2)
+    a_key = c1.selectbox("First paper", keys, index=keys.index(first),
+                         format_func=paper_name)
+    others = [k for k in keys if k != a_key]
+    b_key = c2.selectbox("Second paper", others, format_func=paper_name)
 
-with tab_analyze:
-    with st.expander("Options"):
-        c1, c2 = st.columns(2)
-        max_pages = c1.number_input(
-            "Pages to read", 1, 200, 30, step=5, key="opt_pages"
-        )
-        target_words = c2.number_input(
-            "Summary length (words)", 150, 1500, 450, step=50, key="opt_words"
-        )
-        ocr_mode = st.radio(
-            "Scanned PDFs",
-            ["auto", "always", "never"],
-            horizontal=True,
-            key="opt_ocr",
-            help=(
-                "auto: read a page optically only when it has no text layer. "
-                "always: ignore the text layer and OCR everything. "
-                "never: skip OCR entirely."
-            ),
-        )
-        if ocr.available():
-            st.caption(f"OCR engine: {ocr.backend_label()} -- about 10s per page.")
-        else:
-            st.caption(
-                "OCR engine: not installed. Add rapidocr-onnxruntime to "
-                "requirements.txt to enable it."
+    c = compare.compare(lib[a_key]["analysis"], lib[b_key]["analysis"])
+
+    st.markdown(
+        f'<div class="meta-row"><span class="meta-pill accent">{esc(c.relation)}'
+        f'</span><span class="meta-pill">{c.similarity:.0%} topic overlap'
+        f'</span></div>',
+        unsafe_allow_html=True,
+    )
+    if c.a_cites_b:
+        st.caption("The first paper cites the second.")
+    if c.b_cites_a:
+        st.caption("The second paper cites the first.")
+
+    shared_data = {d.lower() for d in c.shared_datasets}
+    shared_metric = {m[0].lower() for m in c.shared_metrics}
+
+    def side(col, s) -> None:
+        with col:
+            st.markdown(
+                f'<div class="cmp-head">{esc(s.title)}</div>'
+                f'<div class="cmp-sub">{esc(s.authors[:120])}</div>'
+                f'<div class="cmp-sub">{s.pages} pages &middot; {s.words:,} words'
+                f' &middot; {s.reference_count} references</div>',
+                unsafe_allow_html=True,
             )
-
-    uploaded = st.file_uploader("Drop a PDF here", type=["pdf"],
-                                label_visibility="collapsed")
-
-    if uploaded is not None:
-        load(uploaded.getvalue(), uploaded.name, int(max_pages),
-             int(target_words), ocr_mode)
-
-    analysis: Analysis | None = st.session_state.get("analysis")
-
-    if notice := st.session_state.pop("notice", ""):
-        st.success(notice)
-
-    if analysis is None:
-        st.caption(
-            "Upload a paper to begin, or use **Find papers** to pull one "
-            "straight from arXiv."
-        )
-    else:
-        st.divider()
-        render_paper_header(analysis)
-        st.divider()
-
-        # A radio rather than st.tabs: any button inside a tab triggers a
-        # rerun, and st.tabs resets to its first tab on rerun -- which would
-        # bounce you off the Ask pane the moment you clicked a suggestion.
-        # A keyed radio remembers the selection instead.
-        pane = st.radio(
-            "View",
-            ["At a glance", "Ask the paper", "Summary", "More"],
-            horizontal=True,
-            key="pane",
-            label_visibility="collapsed",
-        )
-        st.markdown("")
-
-        if pane == "At a glance":
-            render_brief(analysis)
-
-        elif pane == "Ask the paper":
-            render_ask(analysis)
-
-        elif pane == "Summary":
-            render_summary(analysis)
-
-        else:
-            if analysis.brief.phrases:
-                label("Key phrases")
+            for title, items, empty in (
+                ("Problem", s.problem, "No explicit problem statement found."),
+                ("Method", s.method, "No explicit contribution statement found."),
+                ("Limitations", s.limitations, "No limitations stated."),
+            ):
+                label(title)
                 st.markdown(
-                    " ".join(
-                        f'<span class="chip">{p}</span>'
-                        for p in analysis.brief.phrases
-                    ),
+                    "".join(finding_html(t) for t in items)
+                    or f'<p class="empty-note">{esc(empty)}</p>',
                     unsafe_allow_html=True,
                 )
-
-            if analysis.doc.tables:
-                label("Tables found")
-                for i, table in enumerate(analysis.doc.tables[:6], start=1):
-                    with st.expander(f"Table {i} ({len(table)} rows)"):
-                        header, *rows = table
-                        if rows:
-                            st.dataframe(
-                                [dict(zip(header, r)) for r in rows],
-                                use_container_width=True,
-                            )
-                        else:
-                            st.write(table)
-
-            label("Downloads")
-            d1, d2 = st.columns(2)
-            d1.download_button(
-                "Summary (.md)",
-                analysis.summary.full_text,
-                file_name="avanti-summary.md",
-                use_container_width=True,
-            )
-            d2.download_button(
-                "Extracted text (.txt)",
-                analysis.doc.text,
-                file_name="avanti-text.txt",
-                use_container_width=True,
+            label("Data used")
+            st.markdown(chips(s.datasets, shared_data)
+                        or '<p class="empty-note">None detected.</p>',
+                        unsafe_allow_html=True)
+            label("Reported results")
+            metrics = [f"{k} {v}" for k, v in list(s.metrics.items())[:8]]
+            st.markdown(
+                chips(metrics, {f"{k} {v}".lower() for k, v in s.metrics.items()
+                                if k.lower() in shared_metric})
+                or '<p class="empty-note">None detected.</p>',
+                unsafe_allow_html=True,
             )
 
-            with st.expander("Extracted text (what the analysis actually read)"):
-                st.text(analysis.doc.text[:60000])
+    left, right = st.columns(2, gap="large")
+    side(left, c.a)
+    side(right, c.b)
 
-            # Optional AI panel: only shown when a key is configured, so the
-            # app stays uncluttered for offline use.
-            if llm.has_key():
-                st.divider()
-                label("AI deep analysis (Gemini)")
-                tone = st.selectbox(
-                    "Style", ["Professional", "Academic", "Plain English"]
-                )
-                if st.button("Generate AI report"):
-                    with st.spinner("Asking Gemini..."):
-                        report = llm.deep_analysis(
-                            analysis.paper.body, analysis.doc.title, tone
-                        )
-                    st.markdown(report)
-                    st.download_button(
-                        "Download AI report (.md)", report,
-                        file_name="avanti-ai-report.md",
-                    )
+    st.divider()
+    label("In common")
+    if c.shared_metrics:
+        st.markdown("Metrics both report -- the place to read their numbers "
+                    "against each other:")
+        st.dataframe(
+            [{"Metric": n, "First paper": va, "Second paper": vb}
+             for n, va, vb in c.shared_metrics],
+            width="stretch", hide_index=True,
+        )
+    if c.shared_datasets:
+        st.markdown(f"**Shared data:** {esc(', '.join(c.shared_datasets))}")
+    if c.shared_phrases:
+        st.markdown(f"**Shared key phrases:** {esc(', '.join(c.shared_phrases))}")
+    if c.shared_references:
+        st.markdown(f"**Prior work both cite ({len(c.shared_references)}):**")
+        st.markdown("".join(finding_html(t) for t in c.shared_references[:15]),
+                    unsafe_allow_html=True)
+    if not (c.shared_metrics or c.shared_datasets or c.shared_phrases
+            or c.shared_references):
+        st.caption("No shared data, metrics or references were found.")
+
+
+# ------------------------------------------------------------------- tabs
+
+# A tab change requested by code (after "Analyze this", say) is applied here,
+# before the tabs widget exists -- its state cannot be written once it does.
+if goto := st.session_state.pop("goto_tab", None):
+    st.session_state.main_tab = goto
+
+# Stateful tabs: they keep their selection across reruns, and a hidden tab's
+# body is skipped entirely rather than rendered off-screen.
+tab_analyze, tab_find, tab_compare = st.tabs(
+    ["Analyze a paper", "Find papers", "Compare"],
+    key="main_tab", on_change="rerun",
+)
+
+if tab_analyze.open:
+    with tab_analyze:
+        with st.expander("Options"):
+            c1, c2 = st.columns(2)
+            max_pages = c1.number_input(
+                "Pages to read", 1, 200, 30, step=5, key="opt_pages"
+            )
+            target_words = c2.number_input(
+                "Summary length (words)", 150, 1500, 450, step=50, key="opt_words"
+            )
+            ocr_mode = st.radio(
+                "Scanned PDFs",
+                ["auto", "always", "never"],
+                horizontal=True,
+                key="opt_ocr",
+                help=(
+                    "auto: read a page optically only when it has no text layer. "
+                    "always: ignore the text layer and OCR everything. "
+                    "never: skip OCR entirely."
+                ),
+            )
+            if ocr.available():
+                st.caption(f"OCR engine: {ocr.backend_label()} -- about 10s per page.")
             else:
-                st.divider()
                 st.caption(
-                    "Optional: add a Gemini key to `.streamlit/secrets.toml` "
-                    "for an AI-written report. Everything above works without one."
+                    "OCR engine: not installed on this deployment, so a scanned "
+                    "PDF is reported rather than read."
                 )
 
-with tab_find:
-    query = st.text_input(
-        "Search arXiv", placeholder="graph neural networks for drug discovery"
-    )
-    limit = st.slider("Results", 3, 20, 8)
+        uploaded = st.file_uploader("Drop a PDF here", type=["pdf"],
+                                    label_visibility="collapsed")
 
-    if st.button("Search", type="primary") and query.strip():
-        try:
-            with st.spinner("Searching arXiv..."):
-                st.session_state.results = sources.search_arxiv(query, limit)
-        except requests.RequestException as e:
-            st.error(f"arXiv search failed: {e}")
-            st.session_state.results = []
+        if uploaded is not None:
+            load(uploaded.getvalue(), uploaded.name, int(max_pages),
+                 int(target_words), ocr_mode)
 
-    results = st.session_state.get("results", [])
-    if results:
-        st.caption(f"{len(results)} results")
+        if notice := st.session_state.pop("notice", ""):
+            st.success(notice)
 
-    for i, r in enumerate(results):
-        with st.expander(r.title):
-            st.caption(f"{r.author_line}  &middot;  {r.published}")
-            st.write(r.summary[:700] + ("..." if len(r.summary) > 700 else ""))
+        analysis = current()
+        if analysis is None:
+            st.caption(
+                "Upload a paper to begin, or use **Find papers** to search "
+                "arXiv, OpenAlex and Europe PMC."
+            )
+        else:
+            keys = list(library())
+            if len(keys) > 1:
+                choice = st.selectbox(
+                    "Paper", keys, index=keys.index(st.session_state.key),
+                    format_func=paper_name,
+                    help="Papers analyzed this session. Compare any two in the "
+                         "Compare tab.",
+                )
+                if choice != st.session_state.key:
+                    st.session_state.key = choice
+                    st.session_state.question = ""
+                    st.rerun()
 
-            c1, c2, c3 = st.columns(3)
-            if c1.button("Analyze this", key=f"an{i}", use_container_width=True):
-                try:
-                    with st.spinner("Downloading PDF..."):
-                        data = sources.fetch_pdf(r.pdf_url)
-                    if data is None:
-                        st.error("That link did not return a usable PDF.")
-                    else:
-                        pages, words, ocr_mode = settings()
-                        load(data, r.title, pages, words, ocr_mode)
-                        # Tab bodies execute in written order, and switching
-                        # tabs is client-side only -- so without an explicit
-                        # rerun the analyze tab would still be showing its
-                        # empty state from earlier in this same run.
-                        st.session_state.notice = (
-                            f"Analyzed: {r.title[:70]}"
-                        )
-                        st.rerun()
-                except requests.RequestException as e:
-                    st.error(f"Download failed: {e}")
-            c2.link_button("PDF", r.pdf_url, use_container_width=True)
-            c3.link_button("arXiv page", r.abstract_url, use_container_width=True)
+            st.divider()
+            render_paper_header(analysis)
+            st.divider()
+
+            panes = st.tabs(
+                ["At a glance", "Ask the paper", "Summary", "References", "More"],
+                key="pane", on_change="rerun",
+            )
+            renderers = (render_brief, render_ask, render_summary,
+                         render_references, render_more)
+            for pane, render in zip(panes, renderers):
+                if pane.open:
+                    with pane:
+                        render(analysis)
+
+if tab_find.open:
+    with tab_find:
+        query = st.text_input(
+            "Search", placeholder="graph neural networks for drug discovery"
+        )
+        c1, c2 = st.columns([3, 2])
+        source = c1.selectbox(
+            "Source",
+            ["all", *sources.SOURCES],
+            format_func=lambda s: "All sources" if s == "all" else sources.SOURCES[s],
+            help="arXiv: preprints. OpenAlex: every field, open-access PDFs only. "
+                 "Europe PMC: biomedical and life sciences.",
+        )
+        limit = c2.number_input("Results", 1, sources.MAX_RESULTS, 10, step=5)
+
+        if st.button("Search", type="primary") and query.strip():
+            try:
+                with st.spinner("Searching..."):
+                    found = sources.search(query, int(limit), source)
+                st.session_state.results = found.results
+                st.session_state.search_failed = found.failed
+            except requests.RequestException as e:
+                st.error(f"Search failed: {e}")
+                st.session_state.results = []
+                st.session_state.search_failed = {}
+
+        for name in st.session_state.get("search_failed", {}):
+            st.warning(f"{name} could not be reached; showing the other sources.")
+
+        results = st.session_state.get("results", [])
+        if results:
+            st.caption(f"{len(results)} results")
+
+        for i, r in enumerate(results):
+            with st.expander(r.title):
+                meta = " · ".join(x for x in (r.author_line, r.published) if x)
+                st.markdown(
+                    f'<span class="source-tag">{esc(r.source)}</span>'
+                    f'<span class="ref-meta">{esc(meta)}</span>',
+                    unsafe_allow_html=True,
+                )
+                if r.summary:
+                    st.write(r.summary[:700] + ("..." if len(r.summary) > 700 else ""))
+
+                c1, c2, c3 = st.columns(3)
+                if c1.button("Analyze this", key=f"an{i}", width="stretch"):
+                    try:
+                        with st.spinner("Downloading PDF..."):
+                            data = sources.fetch_pdf(r.pdf_url)
+                        if data is None:
+                            st.error("That link did not return a usable PDF.")
+                        else:
+                            pages, words, ocr_mode = settings()
+                            load(data, r.title, pages, words, ocr_mode)
+                            st.session_state.notice = f"Analyzed: {r.title[:70]}"
+                            st.session_state.goto_tab = "Analyze a paper"
+                            st.rerun()
+                    except (requests.RequestException, sources.UnsafeURL) as e:
+                        st.error(f"Download failed: {e}")
+                c2.link_button("PDF", r.pdf_url, width="stretch")
+                c3.link_button("Source page", r.abstract_url, width="stretch")
+
+if tab_compare.open:
+    with tab_compare:
+        render_compare()

@@ -1,0 +1,53 @@
+name: tests
+
+# Runs the test suite on every push to main and on every pull request.
+#
+# Locked down on purpose:
+#   - The token is read-only. The job can read the code and nothing else: it
+#     cannot push, comment, open issues or touch releases.
+#   - No secrets are used, so there is nothing to leak. The Gemini key lives
+#     in the Streamlit and Render dashboards, never in this repository.
+#   - It runs on `pull_request`, not `pull_request_target`, so a pull request
+#     from someone else's fork gets a read-only token and no secrets.
+#   - Each action is pinned to a full commit hash rather than a tag, so a
+#     tag that is later moved cannot swap in different code.
+#   - The checkout does not keep the token around after it has run.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Install
+        run: pip install -r requirements-dev.txt
+
+      - name: Test
+        run: python -m pytest -q

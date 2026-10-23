@@ -73,6 +73,17 @@ _CUES: Dict[str, Sequence[Tuple[str, float]]] = {
         (r"\b(?:threats? to validity)\b", 3.0),
         (r"\bonly (?:considers?|applies|works)\b", 2.0),
     ),
+    # Not used by the brief, which reads results as numbers via
+    # find_metrics; question answering uses it to spot a result sentence.
+    "result": (
+        (r"\b(?:outperform(?:s|ed)?|surpass(?:es|ed)?)\b", 2.5),
+        (r"\b(?:achieves?|achieved|attains?|reaches)\b[^.]{0,60}\d", 2.5),
+        (r"\bstate[- ]of[- ]the[- ]art\b", 1.5),
+        (r"\b(?:improves?|improved|improvements?)\b[^.]{0,50}\b(?:by|over)\b", 2.0),
+        (r"\bahead of\b", 1.5),
+        (r"\d(?:\.\d+)?\s*(?:%|points?\b|BLEU\b|mAP\b|AP\b|F1\b|PQ\b|mIoU\b|top-1\b)",
+         1.5),
+    ),
     "future": (
         (r"\bfuture work\b", 3.0),
         (r"\bin (?:the )?future\b", 2.5),
@@ -291,6 +302,14 @@ def _salience(sents: List[str]) -> Dict[int, float]:
     return {i: (float(e) - lo) / (hi - lo) for i, e in enumerate(energy)}
 
 
+def cue_score(sentence: str, kind: str) -> float:
+    """How strongly a sentence is phrased as one category (0 if not at all)."""
+    return sum(
+        weight for pattern, weight in _COMPILED_CUES.get(kind, ())
+        if pattern.search(sentence)
+    )
+
+
 def find_by_cues(
     text: str,
     kind: str,
@@ -298,8 +317,7 @@ def find_by_cues(
     page_lookup=None,
 ) -> List[Finding]:
     """Find the sentences that best express one category."""
-    cues = _COMPILED_CUES.get(kind)
-    if not cues:
+    if kind not in _COMPILED_CUES:
         return []
 
     sents = clean_sentences(text, min_chars=40)
@@ -310,13 +328,13 @@ def find_by_cues(
     scored: List[Finding] = []
 
     for i, sent in enumerate(sents):
-        cue_score = sum(weight for pattern, weight in cues if pattern.search(sent))
-        if cue_score <= 0:
+        cues = cue_score(sent, kind)
+        if cues <= 0:
             continue
         # Prefer sentences that are informative as well as cue-bearing, and
         # mildly penalize very long ones, which tend to ramble.
         length_penalty = 0.4 if len(sent.split()) > 55 else 0.0
-        total = cue_score + 0.8 * sal.get(i, 0.0) - length_penalty
+        total = cues + 0.8 * sal.get(i, 0.0) - length_penalty
         scored.append(
             Finding(
                 kind=kind,
@@ -386,16 +404,24 @@ def brief(paper_text: str, sections_map: Optional[Dict[str, str]] = None,
     disc = source("discussion", "conclusion", "results")
     results_text = source("results", "experiments")
 
-    objective = find_by_cues(intro, "objective", 3, page_lookup)
+    objective = find_by_cues(intro, "objective", 4, page_lookup)
     contribution = find_by_cues(
-        intro + "\n" + method, "contribution", 5, page_lookup
+        intro + "\n" + method, "contribution", 6, page_lookup
     )
 
     # A paper's thesis sentence matches both "objective" and "contribution"
-    # cues. Keep it where it was found first, so the read-out does not print
-    # the same sentence twice under two different headings.
-    claimed = {f.text for f in objective}
-    contribution = [f for f in contribution if f.text not in claimed][:4]
+    # cues; print it once, under the heading it matches more strongly. "In
+    # this work we propose the Transformer" is a contribution ("we propose"
+    # outweighs "in this work, we"), and filing it as the problem left the
+    # contribution slot to a stray "we observe" from the ablations.
+    both = {f.text for f in objective} & {f.text for f in contribution}
+    to_contribution = {
+        t for t in both if cue_score(t, "contribution") > cue_score(t, "objective")
+    }
+    objective = [f for f in objective if f.text not in to_contribution][:3]
+    contribution = [
+        f for f in contribution if f.text not in both - to_contribution
+    ][:4]
 
     return Brief(
         objective=objective,

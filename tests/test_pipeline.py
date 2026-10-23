@@ -28,6 +28,35 @@ def test_canonical_headings_are_recognized():
         assert bucket == expected, f"{line!r} -> {bucket!r}, wanted {expected!r}"
 
 
+def test_small_caps_headings_are_recognized():
+    """ICLR-style small caps extract as "I NTRODUCTION"."""
+    paper = sections.split(
+        "A BSTRACT\nWe propose a method.\nI NTRODUCTION\nSome intro text.\n"
+        "R ELATED W ORK\nPrior art.\nR EFERENCES\n[1] A paper."
+    )
+    assert paper.found == ["abstract", "introduction", "related work", "references"]
+    assert paper.get("introduction").label == "INTRODUCTION"
+
+
+def test_small_caps_repair_never_invents_a_word():
+    """'A NEW APPROACH' is a real heading, not a split 'ANEW'."""
+    bucket, _ = sections.classify_heading("II. A NEW APPROACH")
+    assert bucket == "other"
+
+
+def test_a_heading_at_the_top_of_a_page_is_found():
+    """Pages are joined by a form feed; the heading after one must not be lost."""
+    paper = sections.split("Abstract\nWe do things.\f1 Introduction\nBody text.")
+    assert paper.found == ["abstract", "introduction"]
+
+
+def test_a_wrapped_fragment_is_not_a_heading():
+    """It opens with a section alias but stops mid-phrase."""
+    assert sections.classify_heading(
+        "state of the art image segmentation performance with"
+    ) == (None, 0)
+
+
 def test_run_in_phrase_is_not_a_heading():
     """A bold phrase opening a paragraph must not split the paper.
 
@@ -240,6 +269,20 @@ def test_objective_and_contribution_do_not_duplicate():
     b = analyze.brief(text, {"introduction": text, "method": text})
     overlap = {f.text for f in b.objective} & {f.text for f in b.contribution}
     assert not overlap
+
+
+def test_a_thesis_sentence_is_filed_as_the_contribution():
+    """'In this work we propose X' is what the authors did, not the problem."""
+    text = (
+        "Recurrent models are hard to parallelize across long sequences. "
+        "In this work we propose the Transformer, a model architecture based "
+        "entirely on attention instead of recurrence. "
+        "We address the problem of slow sequential computation in translation."
+    )
+    b = analyze.brief(text, {"introduction": text})
+    assert any("we propose the Transformer" in f.text for f in b.contribution)
+    assert not any("we propose the Transformer" in f.text for f in b.objective)
+    assert any("We address the problem" in f.text for f in b.objective)
 
 
 # -------------------------------------------------------------- summarize

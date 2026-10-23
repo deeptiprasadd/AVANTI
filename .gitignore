@@ -38,3 +38,6 @@ htmlcov/
 Thumbs.db
 Desktop.ini
 $RECYCLE.BIN/
+
+# ---- Local tooling ----
+.claude/

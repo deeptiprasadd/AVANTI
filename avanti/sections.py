@@ -76,6 +76,24 @@ _NUMBER_PREFIX = re.compile(
 # phrase that opens a paragraph ("Analysis of Layer Responses. Fig. 7 shows").
 _INTERNAL_BREAK = re.compile(r"\.\s+\S")
 
+# Words a heading never ends on. A line that does is a wrapped sentence
+# fragment: "State of the art image segmentation performance with" opened
+# with a section alias and was filed as Related Work.
+_DANGLING = {
+    "a", "an", "the", "and", "or", "of", "to", "in", "on", "for", "with",
+    "by", "from", "at", "as", "via", "into", "than", "that", "which",
+}
+
+# Small-caps headings extract with the enlarged first letter split off:
+# "I NTRODUCTION", "R ELATED W ORK". Only the rejoined form is checked
+# against the known section names, so a real "A NEW METHOD" is never
+# mangled into "ANEW METHOD".
+_SMALL_CAPS_SPLIT = re.compile(r"\b([A-Z]) (?=[A-Z]{2,}\b)")
+
+# Pages are joined with a form feed, not a newline, so a heading at the top
+# of a page would otherwise share a line with the end of the page before.
+_LINE_BREAK = re.compile(r"[\n\f]")
+
 
 # Markers whose nesting level is set by style rather than by dot count.
 _ROMAN_MARKER = re.compile(r"^[IVXLC]{1,5}[.)]$")
@@ -140,6 +158,8 @@ def classify_heading(line: str) -> Tuple[Optional[str], int]:
         return None, 0
 
     probe = re.sub(r"\s+", " ", body.lower().strip(" .:;-"))
+    if probe.rsplit(" ", 1)[-1] in _DANGLING:
+        return None, 0
 
     for bucket in CANONICAL_ORDER:
         for alias in sorted(_ALIASES[bucket], key=len, reverse=True):
@@ -218,14 +238,33 @@ class Paper:
         return "\n\n".join(p for p in parts if p.strip()) or self.unsectioned
 
 
+def _classify_line(line: str) -> Tuple[Optional[str], int, str]:
+    """classify_heading, plus repair of split small-caps headings.
+
+    Returns (bucket, depth, heading as it should be shown).
+    """
+    bucket, depth = classify_heading(line)
+    if bucket in (None, "other") and _SMALL_CAPS_SPLIT.search(line):
+        rejoined = _SMALL_CAPS_SPLIT.sub(r"\1", line)
+        fixed, fixed_depth = classify_heading(rejoined)
+        if fixed not in (None, "other"):
+            return fixed, fixed_depth, rejoined.strip()
+    return bucket, depth, line.strip()
+
+
+def split_lines(text: str) -> List[str]:
+    """The lines `split` works on; `Section.start_line` indexes into these."""
+    return _LINE_BREAK.split(text)
+
+
 def split(text: str) -> Paper:
     """Split a paper's text into sections."""
-    lines = text.split("\n")
+    lines = split_lines(text)
     paper = Paper()
 
     marks: List[Tuple[int, str, str]] = []  # (line index, bucket, heading)
     for i, ln in enumerate(lines):
-        bucket, depth = classify_heading(ln)
+        bucket, depth, heading = _classify_line(ln)
         if not bucket:
             continue
         # An unrecognized *sub*-heading ("3.1 Residual Learning") belongs to
@@ -233,7 +272,7 @@ def split(text: str) -> Paper:
         # own sections collapsed most of a paper into a single blob.
         if bucket == "other" and depth >= 2:
             continue
-        marks.append((i, bucket, lines[i].strip()))
+        marks.append((i, bucket, heading))
 
     if not marks:
         paper.unsectioned = text.strip()
