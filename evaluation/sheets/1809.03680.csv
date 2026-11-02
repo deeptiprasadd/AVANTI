@@ -1,7 +1,0 @@
-﻿paper,task,question,prediction,verdict,entry
-1809.03680,title,Is this the paper's actual title?,Learning Scripts as Hidden Markov Models,,
-1809.03680,dataset,Is this a dataset the paper uses or evaluates on?,The OMICS,,
-1809.03680,dataset_missed,Datasets the paper uses that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,
-1809.03680,metric,Is this a metric the paper reports?,accuracy,,
-1809.03680,metric_missed,Metrics the paper reports that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,
-1809.03680,reference_count,How many entries does the paper's reference list really have? (type the number in the entry column),0,,

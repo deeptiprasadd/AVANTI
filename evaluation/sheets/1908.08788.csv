@@ -1,9 +1,0 @@
-﻿paper,task,question,prediction,verdict,entry
-1908.08788,title,Is this the paper's actual title?,When Low Resource NLP Meets Unsupervised Language Model: Meta-pretraining Then Meta-learning for Few-shot Text Classification,,
-1908.08788,dataset_missed,Datasets the paper uses that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,
-1908.08788,metric,Is this a metric the paper reports?,accuracy,,
-1908.08788,metric_missed,Metrics the paper reports that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,
-1908.08788,finding:objective,Does this sentence correctly state the problem the paper addresses?,"In this paper, we raise the question that whether it is possible to boost the performance of low-resource natural language processing with the large scale of raw corpus via unsupervised leaning, which require us to handle both task-agnostic and task-specific representation learning.",,
-1908.08788,finding:contribution,Does this sentence correctly state the contribution (what the authors built or propose)?,Thus we propose a M eta-pretraining T hen M eta-learning ( MTM ) approach motivated by the observation that metalearning leads to learning a better parameter initialization for new tasks than multi-task learning across all tasks.,,
-1908.08788,reference_count,How many entries does the paper's reference list really have? (type the number in the entry column),1,,
-1908.08788,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Zemel, R. 2017 | Prototypical networks for few-shot learning | 2018",,

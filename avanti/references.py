@@ -6,12 +6,17 @@ matched against the paper's own in-text citations, which says which prior
 work the paper leans on most: a reference cited eleven times is the work
 being built on; one cited once is background.
 
-Two citation styles cover nearly every paper:
+Four ways of setting a bibliography cover nearly every paper:
 
   numbered     "[12] A. Author, B. Author. Title. Venue, 2019."
+               or "12. A. Author, B. Author. Title. Venue, 2019."
                cited in the text as [12], [3, 12] or [10-14]
+  keyed        "[Author and Author 2019] Author, A.; and Author, B. 2019. Title."
+               cited in the text as (Author and Author 2019)
   author-year  "Author, A. and Author, B. Title. Venue, 2019."
                cited in the text as (Author et al., 2019) or Author (2019)
+  ACL          "Ann Author and Bo Author. 2019. Title. Venue."
+               names in reading order, the year right after them
 
 The bibliography is read from `Document.full_text`, because most papers
 set their references a size below the body text and the analysis text
@@ -31,6 +36,28 @@ from .textutil import normalize_spaces
 
 # "[12] ..." at the start of a line.
 _NUMBERED = re.compile(r"^\s*\[(\d{1,3})\]\s*")
+
+# "12. ..." at the start of a line (Springer, many arXiv templates). A year
+# cannot match: four digits are not followed by the full stop.
+_NUMBERED_DOT = re.compile(r"^\s*(\d{1,3})\.\s+(?=\S)")
+
+# "[Finn and et al. 2017] ..." (AAAI): the in-text label opens the entry.
+_KEYED = re.compile(r"^\s*\[([A-Z][^\]]{2,100}?(?:19|20)\d{2}[a-z]?)\]\s*")
+
+# ACL style opens with names in reading order and the year straight after:
+# "Bo Han and Timothy Baldwin. 2011. Lexical ...". A name word is capitalised
+# or a lowercase particle; anything else (a digit, a bracket) is not a name.
+# PDF text often loses accents to loose marks beside the letter ("Ku¨c¸u¨k"),
+# so those marks count as part of a name.
+_MARKS = "¨´`¸ˆ˜˘˙˚˝ˇ¯"
+_NAME = (
+    rf"(?:[A-ZÀ-ÖØ-ÞĀ-Ž][\w'’\-{_MARKS}]*\.?"
+    r"|and|&|et|de|van|von|der|den|di|da|dos|du|la|le|bin|al|el|ibn|ter)"
+)
+_ACL_TAIL = rf"{_NAME}(?:,?\s+{_NAME})*\s*\.?\s+(?:19|20)\d{{2}}[a-z]?\.\s"
+_ACL_HEAD = re.compile(rf"^{_ACL_TAIL}")
+# Two entries sometimes share a line when columns are read across.
+_ACL_MIDLINE = re.compile(rf"(?<=[.)\]\d])\s+(?={_ACL_TAIL})")
 
 # An author-year entry opens with a surname and a comma: "Kingma, Diederik"
 # or "Jacob Devlin, Ming-Wei Chang". A continuation line can start the same
@@ -135,6 +162,30 @@ def _entries_numbered(lines: List[str]) -> List[str]:
     return entries
 
 
+def _entries_dot_numbered(lines: List[str]) -> List[str]:
+    """Entries opening "1.", "2.", ... A number out of turn is not a marker."""
+    entries: List[str] = []
+    expected = 1
+    for line in lines:
+        m = _NUMBERED_DOT.match(line)
+        if m and int(m.group(1)) == expected:
+            entries.append(line)
+            expected += 1
+        elif entries:
+            entries[-1] += "\n" + line
+    return entries
+
+
+def _entries_keyed(lines: List[str]) -> List[str]:
+    entries: List[str] = []
+    for line in lines:
+        if _KEYED.match(line):
+            entries.append(line)
+        elif entries:
+            entries[-1] += "\n" + line
+    return entries
+
+
 def _entries_author_year(lines: List[str]) -> List[str]:
     entries: List[str] = []
     for line in lines:
@@ -146,16 +197,47 @@ def _entries_author_year(lines: List[str]) -> List[str]:
     return entries
 
 
+def _entries_acl(lines: List[str]) -> List[str]:
+    """Entries that open with names, a full stop, and the year.
+
+    A line starts an entry when the names and year show up together at its
+    head (looking ahead a few lines, since a long author list wraps) and the
+    entry before it has finished -- ended on a full stop, a digit or a
+    bracket, not mid-word or mid-list.
+    """
+    entries: List[str] = []
+    lines = [part for ln in lines for part in _ACL_MIDLINE.sub("\n", ln).split("\n")]
+    for i, line in enumerate(lines):
+        window = " ".join(lines[i : i + 4])
+        starts = bool(_ACL_HEAD.match(window))
+        finished = not entries or entries[-1].rstrip()[-1:] in ".)]\"”0123456789"
+        if starts and finished:
+            entries.append(line)
+        elif entries:
+            entries[-1] += "\n" + line
+    return entries
+
+
 def split_entries(text: str) -> List[str]:
     """Split a bibliography's text into one string per entry."""
     lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
-    numbered = sum(1 for ln in lines if _NUMBERED.match(ln))
-    # Most entries open on a fresh line, so a numbered bibliography shows a
-    # marker on a good share of its lines.
-    if numbered >= 3 and numbered >= len(lines) * 0.15:
+    # Most entries open on a fresh line, so a marked bibliography shows its
+    # marker on a good share of the lines.
+    bracketed = sum(1 for ln in lines if _NUMBERED.match(ln))
+    keyed = sum(1 for ln in lines if _KEYED.match(ln))
+    dotted = _entries_dot_numbered(lines)
+    if bracketed >= 3 and bracketed >= len(lines) * 0.15:
         entries = _entries_numbered(lines)
+    elif len(dotted) >= 3:
+        entries = dotted
+    elif keyed >= 3 and keyed >= len(lines) * 0.15:
+        entries = _entries_keyed(lines)
     else:
-        entries = _entries_author_year(lines)
+        # Surname-first and names-first lists can both look like the other
+        # to a splitter; the one that finds more entries read it correctly.
+        by_surname = _entries_author_year(lines)
+        by_year = _entries_acl(lines)
+        entries = by_year if len(by_year) > len(by_surname) else by_surname
 
     out = []
     for entry in entries:
@@ -222,10 +304,14 @@ def parse_entry(entry: str) -> Reference:
     """Pull authors, title, year and identifiers out of one entry."""
     ref = Reference(text=entry)
 
-    m = _NUMBERED.match(entry)
     body = entry
-    if m:
+    if m := _NUMBERED.match(entry):
         ref.number = int(m.group(1))
+        body = entry[m.end():]
+    elif m := _NUMBERED_DOT.match(entry):
+        ref.number = int(m.group(1))
+        body = entry[m.end():]
+    elif m := _KEYED.match(entry):
         body = entry[m.end():]
 
     if a := _ARXIV.search(body):
@@ -244,7 +330,11 @@ def parse_entry(entry: str) -> Reference:
         ref.title = quoted.group(1).strip(" ,.")
         ref.authors = body[: quoted.start()].strip(" ,.")
     elif parts:
-        ref.authors = parts[0]
+        # "Zemel, R. 2017. Title": the year can sit inside the first segment
+        # when the author list ends on an initial.
+        ref.authors = re.sub(
+            r"[\s,.;]*\(?(?:19|20)\d{2}[a-z]?\)?$", "", parts[0]
+        ).strip()
         rest = parts[1:]
         # ACL style puts the year right after the authors: "Names. 2019. Title."
         if rest and re.fullmatch(r"\(?(?:19|20)\d{2}[a-z]?\)?", rest[0]):
@@ -303,18 +393,39 @@ def count_citations(refs: List[Reference], body: str) -> None:
 # ------------------------------------------------------------ public API
 
 
+def bibliography_text(paper: sections.Paper) -> Optional[str]:
+    """The text of the bibliography, or None if the paper has no such section.
+
+    A short capitalised line with no full stop looks like a heading, and in a
+    bibliography a good many reference titles are exactly that ("ACM Press",
+    "ALBERT: A Lite BERT for Self-supervised Learning"). Each one started a
+    new "section" and cut the bibliography short, so everything after the
+    heading, up to an appendix or acknowledgements, is the bibliography --
+    with those mistaken headings put back as the lines they were.
+    """
+    names = [s.name for s in paper.sections]
+    if "references" not in names:
+        return None
+    i = names.index("references")
+    parts = [paper.sections[i].text]
+    for s in paper.sections[i + 1:]:
+        if s.name in ("appendix", "acknowledgements"):
+            break
+        parts.append(s.heading + "\n" + s.text)
+    return "\n".join(parts)
+
+
 def extract_references(doc, body: str = "") -> List[Reference]:
     """The paper's bibliography, parsed, with in-text citation counts.
 
     `doc` is an avanti.extract.Document; `body` is the text to count
     citations in (normally the paper's body, without the bibliography).
     """
-    paper = sections.analyze(doc.full_text)
-    section = paper.get("references")
-    if section is None:
+    text = bibliography_text(sections.analyze(doc.full_text))
+    if text is None:
         return []
 
-    refs = [parse_entry(e) for e in split_entries(section.text)]
+    refs = [parse_entry(e) for e in split_entries(text)]
     count_citations(refs, body or doc.text)
     return refs
 

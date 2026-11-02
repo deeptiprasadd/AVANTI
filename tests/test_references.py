@@ -177,3 +177,102 @@ def test_shared_matches_by_identifier_or_title():
     ]
     pairs = R.shared(a, b)
     assert {p["a"].number for p in pairs} == {1, 2}
+
+
+# ------------------------------------------------- more bibliography styles
+#
+# The entries below are from real arXiv papers whose reference lists the
+# parser used to read as empty or as a single entry.
+
+DOT_NUMBERED = """\
+1. Maxwell, K. Tamsin, and Burkhard Schafer. "Concept and Context in Legal Information Retrieval." JURIX. 2008.
+2. Danilo S. Carvalho, Minh-Tien Nguyen, Chien-Xuan Tran, Minh-Le Nguyen.
+"Lexical-Morphological Modeling for Legal Text Analysis". Ninth International
+Workshop on Juris-informatics (JURISIN), 2015
+3. Zhe Cao, Tao Qin, Tie-Yan Liu, Ming-Feng Tsai, and Hang Li. Learning to rank:
+from pairwise approach to listwise approach. In ICML, 2007.
+"""
+
+KEYED = """\
+[Finn and et al. 2017] Finn, C., and et al. 2017. Modelagnostic meta-learning for fast adaptation of deep networks.
+In ICML .
+[Snell, Swersky, and Zemel 2017] Snell, J.; Swersky, K.; and
+Zemel, R. 2017. Prototypical networks for few-shot learning. In NIPS, 4077-4087.
+[Sung and et al. 2018] Sung, F., and et al. 2018. Learning to
+compare: Relation network for few-shot learning. In CVPR.
+"""
+
+# Names in reading order, the year straight after, and a PDF that has turned
+# accents into loose marks ("Ku¨c¸u¨k"). The Ritter entry shares its line
+# with the one before it.
+ACL = """\
+Bo Han and Timothy Baldwin. 2011. Lexical normalisation of short text messages: Makn sens a# twitter. In Proceedings
+of the 49th Annual Meeting of the Association for Computational Linguistics, pages 368-378.
+Dilek Ku¨c¸u¨k. 2017. Joint named entity recognition and stance detection in tweets. arXiv preprint arXiv:1707.09611 .
+Dog˘an Ku¨c¸u¨k, Nursal Arıcı, and Dilek Ku¨c¸u¨k. 2017. Named entity recognition in Turkish. In
+Proceedings of the International Conference, pages 176-
+181.
+Paul Newman and Mustapha Ahmad. 1992. Hypocoristic names in hausa. Anthropological Linguistics, pages 159-172. Alan Ritter, Sam Clark, Oren Etzioni, et al. 2011. Named entity recognition in tweets: an experimental study. In Proceedings, pages 1524-1534.
+"""
+
+
+def test_entries_numbered_with_a_full_stop_are_split_and_numbered():
+    refs = _parse(DOT_NUMBERED)
+    assert [r.number for r in refs] == [1, 2, 3]
+    assert refs[1].text.startswith("2. Danilo S. Carvalho")
+    assert refs[1].authors.startswith("Danilo S. Carvalho")
+    assert refs[1].text.endswith("2015")
+
+
+def test_a_year_is_not_taken_for_an_entry_number():
+    """"2008." at the start of a line is a year, not entry number 8."""
+    text = DOT_NUMBERED.replace("JURIX. 2008.", "JURIX.\n2008.")
+    assert [r.number for r in _parse(text)] == [1, 2, 3]
+
+
+def test_keyed_entries_split_on_their_labels_and_drop_them():
+    refs = _parse(KEYED)
+    assert len(refs) == 3
+    assert refs[1].authors == "Snell, J.; Swersky, K.; and Zemel, R"
+    assert refs[1].title == "Prototypical networks for few-shot learning"
+    assert refs[1].year == 2017
+    assert refs[0].authors == "Finn, C., and et al"
+
+
+def test_names_first_entries_split_where_the_year_follows_the_names():
+    refs = _parse(ACL)
+    assert [r.year for r in refs] == [2011, 2017, 2017, 1992, 2011]
+    assert refs[0].authors == "Bo Han and Timothy Baldwin"
+    assert refs[0].title.startswith("Lexical normalisation")
+    # Accents the PDF split off do not hide an entry.
+    assert refs[2].authors.startswith("Dog˘an")
+    # Two entries on one line are two entries.
+    assert refs[3].text.endswith("pages 159-172.")
+    assert refs[4].authors.startswith("Alan Ritter")
+
+
+def test_a_reference_title_that_looks_like_a_heading_does_not_end_the_list():
+    from avanti import sections
+
+    text = "\n".join([
+        "1 Introduction",
+        "Earlier work studied the problem at length in many settings.",
+        "References",
+        "Samuel R. Bowman, Gabor Angeli, and Christopher Manning. 2015. A large",
+        "annotated corpus for learning natural language inference.",
+        "ACM Press",
+        "Daniel Cer, Mona Diab, and Eneko Agirre. 2017. Semeval-2017 task 1. In",
+        "Proceedings of SemEval.",
+        "Appendix",
+        "Extra tables.",
+    ])
+    body = R.bibliography_text(sections.analyze(text))
+    assert "Daniel Cer" in body and "ACM Press" in body
+    assert "Extra tables" not in body
+
+
+def test_bibliographical_references_is_a_bibliography_heading():
+    from avanti import sections
+
+    bucket, _ = sections.classify_heading("7. Bibliographical References")
+    assert bucket == "references"

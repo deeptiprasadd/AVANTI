@@ -58,7 +58,9 @@ _ALIASES: Dict[str, Tuple[str, ...]] = {
                    "conclusion and future work", "summary and conclusion"),
     "acknowledgements": ("acknowledgement", "acknowledgements",
                          "acknowledgment", "acknowledgments", "funding"),
-    "references": ("references", "bibliography", "works cited"),
+    "references": ("references", "bibliography", "works cited",
+                   "bibliographical references", "reference list",
+                   "literature cited"),
     "appendix": ("appendix", "appendices", "supplementary material",
                  "supplementary", "supplemental material"),
 }
