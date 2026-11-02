@@ -364,7 +364,8 @@ def parse_entry(entry: str) -> Reference:
         ref.title = quoted.group(1).strip(" ,.")
         ref.authors = body[: quoted.start()].strip(" ,.")
     elif colon:
-        ref.authors = colon[0].strip(" ,.")
+        # The full stop of the last initial belongs to the name.
+        ref.authors = colon[0].strip(" ,")
         ref.title = colon[1].strip(" ,.")
     elif parts:
         # "Zemel, R. 2017. Title": the year can sit inside the first segment

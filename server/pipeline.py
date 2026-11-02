@@ -95,6 +95,7 @@ def to_json(a: Analysis) -> dict:
             "future": [_finding(f) for f in b.future],
             "datasets": b.datasets,
             "metrics": [_metric(m) for m in b.metrics],
+            "metricNames": b.metric_names,
             "phrases": b.phrases,
         },
         "summary": {

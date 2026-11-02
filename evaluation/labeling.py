@@ -67,12 +67,14 @@ def make_rows(paper_id: str, analysis) -> List[Dict[str, str]]:
         "Datasets the paper uses that are NOT listed above. Separate with ; "
         "and leave blank if none. (type in the entry column)")
 
+    names = list(getattr(brief, "metric_names", []))
+    names += [hit.name for hit in brief.metrics]
     seen = set()
-    for hit in brief.metrics:
-        key = hit.name.lower()
+    for name in names:
+        key = name.lower()
         if key not in seen and len(seen) < MAX_PER_TASK:
             seen.add(key)
-            add("metric", "Is this a metric the paper reports?", hit.name)
+            add("metric", "Is this a metric the paper reports?", name)
     add("metric_missed",
         "Metrics the paper reports that are NOT listed above. Separate with ; "
         "and leave blank if none. (type in the entry column)")

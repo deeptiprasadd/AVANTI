@@ -216,7 +216,12 @@ def find_metric_names(text: str, limit: int = 8) -> List[str]:
             near = flat[max(0, m.start() - _CONTEXT_CHARS) : m.end() + _CONTEXT_CHARS]
             check = _RECALL_CONTEXT if name == "recall" else _EVAL_CONTEXT
             if check.search(near):
-                used += 1
+                # Another metric beside it ("precision, recall and F-score")
+                # settles that this is an evaluation, not prose.
+                sibling = any(
+                    p.search(near) for n, p, _ in _METRIC_FORMS if n != name
+                )
+                used += 2 if sibling else 1
         if used >= (1 if distinctive else 2):
             found.append((used, name))
     found.sort(key=lambda t: -t[0])
