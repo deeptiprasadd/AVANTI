@@ -42,3 +42,4 @@ $RECYCLE.BIN/
 # Downloaded papers used for labelling (not ours to redistribute)
 evaluation/papers/
 evaluation/papers_heldout/
+evaluation/papers_final/

@@ -72,3 +72,64 @@ Paired MRR differences (mean over questions, 95% bootstrap interval):
 - The intervals come from resampling questions. They do not cover the
   choice of tuning grid or of embedding model.
 - The intent share (577 of 882) was measured on dev only.
+
+
+# Read-out and references (hand-labelled)
+
+Ten papers per set, all NLP papers from the QASPER test split, drawn at
+random with a fixed seed (`random.Random(7)` over the sorted ids). Each row
+the tool produced was judged against the PDF; reference counts were checked
+against the rendered reference pages. How the rows were judged is in
+`LABELING.md`. 95% intervals resample papers, so with ten papers they are wide.
+
+- **Set 1** (`sheets/`, ten papers) was labelled before the fixes described
+  below, and was looked at while making them.
+- **Set 2** (`sheets_final/`, ten different papers) was downloaded after the
+  fixes and not looked at until then. It is the fair measurement. No change
+  was made to the tool after seeing it.
+
+| Measure | Set 1, before fixes | Set 2, after fixes |
+|---|---|---|
+| Title correct | 1.00 [1.00, 1.00] | 0.90 [0.70, 1.00] |
+| Contribution sentences correct | 0.82 [0.67, 1.00] | 0.85 [0.74, 0.96] |
+| Problem ("objective") sentences correct | 0.25 [0.00, 0.33] | 0.78 [0.43, 1.00] |
+| Limitation sentences correct | 0.44 [0.13, 0.71] | no limitation sentences returned |
+| Datasets: precision | 0.56 [0.29, 0.80] | 0.83 [0.33, 1.00] |
+| Datasets: recall | 0.50 [0.22, 0.81] | 0.42 [0.11, 0.69] |
+| Datasets: F1 | 0.53 [0.29, 0.72] | 0.56 [0.18, 0.82] |
+| Metrics: precision | 0.50 [0.00, 1.00] | 0.82 [0.60, 1.00] |
+| Metrics: recall | 0.07 [0.00, 0.17] | 0.53 [0.26, 0.80] |
+| Metrics: F1 | 0.13 [0.10, 0.29] | 0.64 [0.41, 0.86] |
+| Reference count within 10% of the real one | 0.90 [0.70, 1.00] | 0.50 [0.20, 0.80] |
+| Sampled references parsed fully correctly | 0.77 [0.57, 0.91] | 0.76 [0.59, 0.89] |
+
+The fixes between the sets: metric names are found without a number beside
+them (and "Recall that..." is no longer a metric); the problem sentence must
+state a gap or a question; a bare "However" no longer makes a limitation;
+platforms, analogies and repeats are dropped from the dataset list; and
+bibliographies in four more styles are read.
+
+## What this shows
+
+- The metric, problem-sentence and dataset-precision fixes carry over to
+  papers the code had not been tuned on. The two sets are different papers,
+  so the before/after figures are indicative, not a controlled comparison.
+- Reference extraction does not generalise as well as the first set
+  suggested. Over both sets, 14 of 20 reference counts are within 10%. On set
+  2 the counts were too low on five papers (0 of 2, 17 of 19, 21 of 28,
+  38 of 43, 22 of 29). Causes seen: the `Authors (Year). Title.` style, two
+  columns running together, and entries cut short.
+- Dataset recall is low: datasets named without the word "dataset" or
+  "corpus" beside them (DUC 2002, MultiWOZ, IWSLT 2015, CCPC1.0) are missed.
+- One title was wrong: a ligature extracted as "ffi E cient".
+
+## Limits
+
+- Ten papers per set, one field (NLP), one source (arXiv).
+- A single labeller made all of these judgements. They have not yet been
+  checked by an independent person; `spotcheck/` holds three blank sheets for
+  that, and `python -m evaluation.labeling agree` compares them.
+- Recall for datasets and metrics is measured against what the labeller found
+  in each paper, not an exhaustive list.
+- Limitation sentences could not be assessed on set 2, because the tool
+  returned none for those papers.

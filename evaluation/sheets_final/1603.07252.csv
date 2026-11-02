@@ -1,0 +1,18 @@
+﻿paper,task,question,prediction,verdict,entry
+1603.07252,title,Is this the paper's actual title?,Neural Summarization by Extracting Sentences and Words,y,
+1603.07252,dataset_missed,Datasets the paper uses that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,DUC 2002; DailyMail
+1603.07252,metric,Is this a metric the paper reports?,ROUGE,y,
+1603.07252,metric_missed,Metrics the paper reports that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,
+1603.07252,finding:contribution,Does this sentence correctly state the contribution (what the authors built or propose)?,We develop a general framework for singledocument summarization which can be used to extract sentences or words.,y,
+1603.07252,finding:contribution,Does this sentence correctly state the contribution (what the authors built or propose)?,In this work we propose a data-driven approach to summarization based on neural networks and continuous sentence features.,y,
+1603.07252,reference_count,How many entries does the paper's reference list really have? (type the number in the entry column),36,,36
+1603.07252,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Dzmitry Bahdanau, Kyunghyun Cho, and Yoshua Bengio | Neural machine translation by jointly learning to align and translate | 2015",y,
+1603.07252,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Ciprian Chelba, Tomas Mikolov, Mike Schuster, Qi Ge, Thorsten Brants, Phillipp Koehn, and Tony Robinson | One billion word benchmark for measuring progress in statistical language modeling | 2014",y,
+1603.07252,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)",Elena Filatova and Vasileios Hatzivassiloglou | Event-based extractive summarization | 2004,y,
+1603.07252,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Caglar Gulcehre, Sungjin Ahn, Ramesh Nallapati, Bowen Zhou, and Yoshua Bengio | Pointing the unknown words | 2016",y,
+1603.07252,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Yoon Kim, Yacine Jernite, David Sontag, and Alexander M Rush | Character-aware neural language models | 2016",y,
+1603.07252,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Julian Kupiec, Jan O. Pedersen, and Francine Chen | A trainable document summarizer | 1995",y,
+1603.07252,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)",Rada Mihalcea | Language independent extractive summarization | 2005,y,
+1603.07252,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Daraksha Parveen, Hans-Martin Ramsl, and Michael Strube | Topical coherence for graph-based extractive summarization | 1954",n,
+1603.07252,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Ilya Sutskever, Oriol Vinyals, and Quoc VV Le | Sequence to sequence learning with neural networks | 2014",y,
+1603.07252,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)",Ronald J Williams | Simple statistical gradient-following algorithms for connectionist reinforcement learning | 1992,y,

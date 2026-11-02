@@ -51,16 +51,31 @@ objective sentences are still sometimes background; datasets can still list
 class names ("Legitimate", "Malicious"); metric names in survey papers are
 mentions, not results.
 
-## D. Measure again, fairly
+## D. Measure again, fairly  (done except your spot-check)
 
-- [ ] **Download 10 more unseen papers.**
-      Why: the 10 labelled papers were looked at while fixing, so they can no
-      longer give an honest number for the parts fixed in C.
-- [ ] **Label them and score.**
-- [ ] **Spot-check 2 or 3 papers by hand yourself (about 1 hour).**
-      Why: the labels so far were made by the assistant, not an independent person.
-      Reporting agreement with your check makes the numbers defensible.
-- [ ] **Update `evaluation/RESULTS.md` with the final read-out numbers.**
+- [x] **Download 10 more unseen papers** (`evaluation/papers_final/`, not in git).
+      Why: the first 10 had been looked at while fixing.
+- [x] **Label them and score** (`evaluation/sheets_final/`).
+      Result: metrics F1 0.13 -> 0.64, problem sentences 0.25 -> 0.78,
+      dataset precision 0.56 -> 0.83. Reference counts did not hold up:
+      0.50 within 10% on the new papers.
+- [ ] **Spot-check 3 papers by hand yourself (about 1 hour)** -- yours to do.
+      Fill `evaluation/spotcheck/*.csv` from the PDFs, then run
+      `python -m evaluation.labeling agree --a evaluation/sheets_final --b evaluation/spotcheck`.
+      Why: all labels so far come from one labeller. Reporting agreement with
+      your independent check makes the numbers defensible.
+- [x] **Update `evaluation/RESULTS.md`** with both sets and the limits.
+
+## D2. Problems the fair test found (decide whether to fix before writing)
+
+- [ ] **Reference counts too low on 5 of 10 new papers.** Causes seen:
+      `Authors (Year). Title.` style, two columns running together, entries
+      cut short, a 2-entry list with no markers.
+- [ ] **Dataset recall 0.42:** names without "dataset" beside them are missed.
+- [ ] **Limitation sentences:** none returned on the new papers; cannot be assessed.
+- [ ] **Titles with ligatures** extract as "ffi E cient".
+- Note: fixing any of these means the 20 labelled papers are used up for that
+  part; a third set would be needed for an honest number.
 
 ## E. Write and present
 

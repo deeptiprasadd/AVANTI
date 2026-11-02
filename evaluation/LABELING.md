@@ -65,3 +65,18 @@ correctly.
 
 Recall is measured against the datasets and metrics you found while
 labelling, not against a complete list.
+
+## Independent spot-check
+
+`evaluation/spotcheck/` holds blank copies of three sheets (1905.05644,
+1908.11664, 2002.06854). Fill them in yourself, from the PDFs in
+`evaluation/papers_final/`, without looking at `evaluation/sheets_final/`.
+Then compare:
+
+```
+python -m evaluation.labeling agree --a evaluation/sheets_final --b evaluation/spotcheck
+```
+
+It prints how often the two sets of answers match (y/n agreement, kappa,
+missed-list and reference-count agreement). About an hour of work, and it is
+what makes the numbers defensible.

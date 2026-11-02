@@ -1,0 +1,20 @@
+﻿paper,task,question,prediction,verdict,entry
+1606.07947,title,Is this the paper's actual title?,Sequence-Level Knowledge Distillation,y,
+1606.07947,dataset,Is this a dataset the paper uses or evaluates on?,WMT,y,
+1606.07947,dataset_missed,Datasets the paper uses that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,IWSLT 2015
+1606.07947,metric,Is this a metric the paper reports?,BLEU,y,
+1606.07947,metric,Is this a metric the paper reports?,perplexity,y,
+1606.07947,metric_missed,Metrics the paper reports that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,
+1606.07947,finding:objective,Does this sentence correctly state the problem the paper addresses?,"In this work, we investigate knowledge distillation in the context of neural machine translation.",y,
+1606.07947,finding:contribution,Does this sentence correctly state the contribution (what the authors built or propose)?,"Furthermore, we observe that our proposed approach has other benefits, such as not requiring any beam search at test-time.",y,
+1606.07947,reference_count,How many entries does the paper's reference list really have? (type the number in the entry column),53,,53
+1606.07947,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)",Lei Jimmy Ba and Rich Caruana | Do Deep Nets Really Need to be Deep? | 2014,y,
+1606.07947,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)",Boxing Chen and Colin Cherry | A Systematic Comparison of Smoothing Techniques for Sentence-Level BLEU | 2014,y,
+1606.07947,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Matthieu Courbariaux, Itay Hubara, Daniel Soudry, Ran El-Yaniv, and Yoshua Bengio | Binarized Neural Networks: Training Neural Networks with Weights and Activations Constrained to +1 or -1 | 2016",y,
+1606.07947,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Dan Gillick, Cliff Brunk, Oriol Vinyals, and Amarnag Subramanya | Multilingual Language Processing from Bytes | 2016",y,
+1606.07947,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)",Nal Kalchbrenner and Phil Blunsom | Recurrent Continuous Translation Models | 2013,y,
+1606.07947,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Jiwei Li, Michael Galley, Chris Brockett, Jianfeg Gao, and Bill Dolan | A Diversity- Promoting Objective Function for Neural Conversational Models | 2016",y,
+1606.07947,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Zhiyun Lu, Vikas Sindhwani, and Tara N. Sainath | Learning Compact Recurrent Neural Networks | 2016",y,
+1606.07947,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Kishore Papineni, Slim Roukos, Todd Ward, and Wei-Jing Zhu | BLEU: A Method for Automatic Evaluation of Machine Translation | 2002",y,
+1606.07947,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Abigail See, Minh-Thang Luong, and Christopher D. Manning | Compression of Neural Machine Translation via Pruning | 2016",y,
+1606.07947,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Ilya Sutskever, Oriol Vinyals, and Quoc Le | Sequence to Sequence Learning with Neural Networks | 2014",y,

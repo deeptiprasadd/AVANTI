@@ -86,3 +86,36 @@ def test_sheets_round_trip_through_csv(tmp_path):
     back = labeling.read_sheets(str(tmp_path))
     assert back == rows
     assert labeling.score(back, n_boot=20)[0]["title accuracy"]["value"] == 1.0
+
+
+def _two_labellers():
+    mine = _filled({"title": "y"}, missed_datasets="SQuAD; MNLI", true_refs="25")
+    yours = _filled({"title": "y"}, missed_datasets="SQuAD", true_refs="26")
+    # Disagree on the first dataset verdict only.
+    for rows, verdict in ((mine, "y"), (yours, "n")):
+        for r in rows:
+            if r["task"] == "dataset":
+                r["verdict"] = verdict
+                break
+    return mine, yours
+
+
+def test_agreement_counts_matching_verdicts_lists_and_counts():
+    mine, yours = _two_labellers()
+    got = labeling.agreement(mine, yours)
+    assert got["yes/no rows compared"] == 2      # the title and one dataset
+    assert got["yes/no agreement"] == 0.5
+    # Lists differ in length (2 vs 1); reference counts 25 vs 26 are within 10%.
+    assert got["list and count rows compared"] == 3
+    assert abs(got["list and count agreement"] - 2 / 3) < 1e-9
+
+
+def test_kappa_is_one_for_identical_sheets_and_below_one_otherwise():
+    mine, _ = _two_labellers()
+    for r in mine:
+        if r["task"] == "dataset":
+            r["verdict"] = "n"
+    same = labeling.agreement(mine, [dict(r) for r in mine])
+    assert same["yes/no agreement"] == 1.0
+    mine2, yours2 = _two_labellers()
+    assert labeling.agreement(mine2, yours2)["kappa"] < 1.0

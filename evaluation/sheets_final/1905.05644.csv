@@ -1,0 +1,23 @@
+﻿paper,task,question,prediction,verdict,entry
+1905.05644,title,Is this the paper's actual title?,Meta-Learning for Low-resource Natural Language Generation in Task-oriented Dialogue Systems,y,
+1905.05644,dataset,Is this a dataset the paper uses or evaluates on?,NLG,n,
+1905.05644,dataset_missed,Datasets the paper uses that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,MultiWOZ
+1905.05644,metric,Is this a metric the paper reports?,BLEU,y,
+1905.05644,metric,Is this a metric the paper reports?,kappa,y,
+1905.05644,metric,Is this a metric the paper reports?,p-value,y,
+1905.05644,metric_missed,Metrics the paper reports that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,slot error rate (ERR)
+1905.05644,finding:objective,Does this sentence correctly state the problem the paper addresses?,"In this paper, we study NLG in a low-resource setting to generate sentences in new scenarios with handful training examples.",y,
+1905.05644,finding:contribution,Does this sentence correctly state the contribution (what the authors built or propose)?,The main contribution of this paper is two-fold: • We propose a meta-learning algorithm Meta-NLG based on MAML for low-resource NLG tasks.,y,
+1905.05644,finding:contribution,Does this sentence correctly state the contribution (what the authors built or propose)?,"In this paper, instead of casting the problem as modelbased approaches, we propose a generalized optimizationbased meta-learning approach to directly enhance the optimization procedure for the low-resource NLG task.",y,
+1905.05644,finding:contribution,Does this sentence correctly state the contribution (what the authors built or propose)?,"In this paper, we propose a generalized meta optimization method based on MAML to directly solve the intrinsic learning issues of low-resource NLG tasks.",y,
+1905.05644,reference_count,How many entries does the paper's reference list really have? (type the number in the entry column),21,,28
+1905.05644,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Marcin Andrychowicz, Misha Denil, Sergio Gomez, Matthew W Hoffman, David Pfau, Tom Schaul, Brendan Shillingford, and Nando De Freitas | Learning to learn by gradient descent by gradient descent | 2016",y,
+1905.05644,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Chelsea Finn, Pieter Abbeel, and Sergey Levine | Model-agnostic meta-learning for fast adaptation of deep networks | 2017",y,
+1905.05644,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Jiatao Gu, Yong Wang, Yun Chen, Victor OK Li, and Kyunghyun Cho | Meta-learning for low-resource neural machine translation | 2018",y,
+1905.05644,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)",Diederik Kingma and Jimmy Ba | Adam: A method for stochastic optimization | 2014,y,
+1905.05644,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Nikhil Mishra, Mostafa Rohaninejad, Xi Chen, and Pieter Abbeel | Meta-learning with temporal convolutions | 2017",y,
+1905.05644,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)",Devang K Naik and RJ Mammone | Meta-neural networks that learn by learning | 1992,y,
+1905.05644,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Flood Sung, Yongxin Yang, Li Zhang, Tao Xiang, Philip HS Torr, and Timothy M Hospedales | Learning to compare: Relation network for few-shot learning | 2018",y,
+1905.05644,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)",Van-Khanh Tran and Le-Minh Nguyen | Adversarial domain adaptation for variational neural language generation in dialogue systems | 2018,y,
+1905.05644,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Bo-Hsiang Tseng, Florian Kreyssig, Paweł Budzianowski, In˜igo Casanueva, Yen-chen Wu, Stefan Ultes, and Milica Gasic | Variational cross-domain natural language generation for spoken dialogue systems | 2018",y,
+1905.05644,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Tsung-Hsien Wen, Milica Gasˇic, Dongho Kim, Nikola Mrksˇic, Pei-Hao Su, David Vandyke, and Steve Young | Stochastic language generation in dialogue using recurrent neural networks with convolutional sentence reranking | 2015",y,

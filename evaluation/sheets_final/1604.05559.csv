@@ -1,0 +1,6 @@
+﻿paper,task,question,prediction,verdict,entry
+1604.05559,title,Is this the paper's actual title?,ffi E cient Calculation of Bigram Frequencies in a Corpus of Short Texts,n,
+1604.05559,dataset_missed,Datasets the paper uses that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,
+1604.05559,metric_missed,Metrics the paper reports that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,
+1604.05559,finding:contribution,Does this sentence correctly state the contribution (what the authors built or propose)?,We show that an efficient and popular method for calculating bigram frequencies is unsuitable for bodies of short texts and offer a simple alternative.,y,
+1604.05559,reference_count,How many entries does the paper's reference list really have? (type the number in the entry column),0,,2

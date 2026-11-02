@@ -1,0 +1,23 @@
+﻿paper,task,question,prediction,verdict,entry
+1912.04979,title,Is this the paper's actual title?,ADVANCES IN ONLINE AUDIO-VISUAL MEETING TRANSCRIPTION,y,
+1912.04979,dataset,Is this a dataset the paper uses or evaluates on?,LibriSpeech,y,
+1912.04979,dataset,Is this a dataset the paper uses or evaluates on?,VoxCeleb,y,
+1912.04979,dataset_missed,Datasets the paper uses that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,
+1912.04979,metric,Is this a metric the paper reports?,WER,y,
+1912.04979,metric,Is this a metric the paper reports?,accuracy,n,
+1912.04979,metric_missed,Metrics the paper reports that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,speaker-attributed WER
+1912.04979,finding:objective,Does this sentence correctly state the problem the paper addresses?,"Although the recently held CHiME-5 challenge helped the community make a step forward to a realistic setting, it still allowed the use of ground-truth speaker segments.",y,
+1912.04979,finding:objective,Does this sentence correctly state the problem the paper addresses?,"However, no previous studies comprehensively address the challenges that one might encounter in real meetings.",y,
+1912.04979,finding:objective,Does this sentence correctly state the problem the paper addresses?,"While much progress has been made in audio-visual speech separation, the challenge of dealing with all kinds of image variations remains unsolved.",y,
+1912.04979,finding:contribution,Does this sentence correctly state the contribution (what the authors built or propose)?,We show how continuous speech separation can fit in with an overall meeting transcription architecture to generate speaker-annotated transcripts.,y,
+1912.04979,reference_count,How many entries does the paper's reference list really have? (type the number in the entry column),57,,57
+1912.04979,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","C.-C. Chiu, A. Tripathi, K. Chou, C. Co, N. Jaitly, D. Jaunzeikare, A. Kannan, P. Nguyen, H. Sak, A. Sankar, J. Tansuwan, N. Wan, Y. Wu, and X. Zhang | Speech recognition for medical conversations | 2017",y,
+1912.04979,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","G. Saon, G. Kurata, T. Sercu, K. Audhkhasi, S. Thomas, D. Dimitriadis, X. Cui, B. Ramabhadran, M. Picheny, L.-L. Lim, B. Roomi, and P. Hall | English conversational telephone speech recognition by humans and machines | 2017",y,
+1912.04979,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","G. Sell, D. Snyder, A. McCree, D. Garcia-Romero, J. Villalba, M.Maciejewski, V.Manohar, N.Dehak, D.Povey, S.Watanabe, and S. Khudanpur | Diarization is hard: some experiences and lessons learned for the JHU team in the inaugural DIHARD challenge | 2018",y,
+1912.04979,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)",L. Drude and R. Haeb-Umbach | Tight integration of spatial andspectralfeaturesforBSSwithdeepclusteringembeddings | 2017,n,
+1912.04979,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","N. Kanda, C. Boeddeker, J. Heitkaemper, Y. Fujita, S. Horiguchi, K. Nagamatsu, and R. Haeb-Umbach | Guided source separation meets a strong ASR backend: Hitachi/Paderborn university joint investigation for dinner party ASR | 2019",y,
+1912.04979,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","J. Wu, Y. Xu, S.-X. Zhang, L.-W. Chen, M. Yu, L. Xie, and D. Yu | Time domain audio visual speech separation | 2019",y,
+1912.04979,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","I. D. Gebru, S. Ba, X. Li, and R. Horaud | Audio-visual speaker diarization based on spatiotemporal Bayesian fusion | 2018",y,
+1912.04979,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","M. Souden, J. Benesty, and S. Affes | On optimal frequencydomain multichannel linear filtering for noise reduction | 2007",y,
+1912.04979,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","N. Ito, S. Araki, and T. Nakatani | Complex angular central Gaussian mixture model for directional statistics in mask-based microphone array signal processing | 2016",y,
+1912.04979,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Xiang Ming, Fangyun Wei, Ting Zhang, Dong Chen, and Fang Wen | Group sampling for scale invariant face detection | 2019",y,

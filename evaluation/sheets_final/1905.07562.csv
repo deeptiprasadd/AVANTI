@@ -1,0 +1,19 @@
+﻿paper,task,question,prediction,verdict,entry
+1905.07562,title,Is this the paper's actual title?,Human-like machine thinking: Language guided imagination,y,
+1905.07562,dataset_missed,Datasets the paper uses that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,
+1905.07562,metric_missed,Metrics the paper reports that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,accuracy
+1905.07562,finding:objective,Does this sentence correctly state the problem the paper addresses?,"However, current natural language processing models are primarily limited to the word probability estimation.",y,
+1905.07562,finding:contribution,Does this sentence correctly state the contribution (what the authors built or propose)?,"Inspired by the human-like brain organization, we build a 'PFC' network to combine language and vision streams to achieve tasks such as language controlled imagination, and imagination based thinking process.",y,
+1905.07562,finding:contribution,Does this sentence correctly state the contribution (what the authors built or propose)?,"Based on the LGI, we present the first language guided continual thinking process, which shows considerable promise for the human-like strong machine intelligence.",y,
+1905.07562,finding:contribution,Does this sentence correctly state the contribution (what the authors built or propose)?,"Here, we propose a textizer (a rounding operation, followed by symbol mapping from binary vector, whose detailed discussion can be referred to the Supplementary section A) to classify the predicted symbol instead of softmax operation which has no neuroscience foundation.",y,
+1905.07562,reference_count,How many entries does the paper's reference list really have? (type the number in the entry column),30,,30
+1905.07562,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Wei, M., He, Y., Zhang, Q | & Si, L. (2019) | 1903",n,
+1905.07562,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Baddeley, A., Gathercole, S | & Papagno, C. (1998) | 1998",n,
+1905.07562,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","DiCarlo, J. J., Zoccolan, D | & Rust, N. C. (2012) | 2012",n,
+1905.07562,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Anonymous A | The development, recognition, and learning mechanisms of animal-like neural network | 2019",y,
+1905.07562,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Liu, L., Wong, T. P., Pozza, M. F., Lingenhoehl, K., Wang, Y., Sheng, M | & Wang, Y. T. (2004) | 2004",n,
+1905.07562,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","LeCun, Y., Bengio, Y | & Hinton, G. (2015) | 2015",n,
+1905.07562,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Petanjek, Z., Judaš, M., Kostovic´, I | & Uylings, H. B. (2007) | 2007",n,
+1905.07562,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Silver, D., Huang, A., Maddison, C. J., Guez, A., Sifre, L., Van Den Driessche, G., & Dieleman, S | Mastering the game of Go with deep neural networks and tree search | 2016",y,
+1905.07562,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Battaglia, P., Pascanu, R., Lai, M | & Rezende, D. J. (2016) | 2016",n,
+1905.07562,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Afouras, T., Chung, J. S | & Zisserman, A. (2018) | 2018",n,

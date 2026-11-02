@@ -250,6 +250,59 @@ def score(rows: List[Dict[str, str]], n_boot: int = 1000, seed: int = 0):
     return out, len(by_paper), blank
 
 
+def agreement(rows_a: List[Dict[str, str]], rows_b: List[Dict[str, str]]) -> Dict[str, float]:
+    """How closely two people's sheets for the same papers agree.
+
+    Rows are paired by paper and position, since both started from the same
+    sheet. A y/n row agrees when the verdicts match; a "missed" row when the
+    two lists are the same length; a reference count when within 10% of each
+    other. Cohen's kappa corrects the y/n agreement for chance.
+    """
+    def keyed(rows):
+        out: Dict[Tuple[str, int], Dict[str, str]] = {}
+        seen: Dict[str, int] = defaultdict(int)
+        for r in rows:
+            out[(r["paper"], seen[r["paper"]])] = r
+            seen[r["paper"]] += 1
+        return out
+
+    a, b = keyed(rows_a), keyed(rows_b)
+    both_y = both_n = a_y_b_n = a_n_b_y = 0
+    other_total = other_same = 0
+    for key in a.keys() & b.keys():
+        ra, rb = a[key], b[key]
+        task = ra["task"]
+        if task in ("dataset_missed", "metric_missed"):
+            other_total += 1
+            other_same += _count_items(ra["entry"]) == _count_items(rb["entry"])
+        elif task == "reference_count":
+            ea, eb = (ra["entry"] or "").strip(), (rb["entry"] or "").strip()
+            if ea.isdigit() and eb.isdigit():
+                other_total += 1
+                other_same += abs(int(ea) - int(eb)) <= 0.1 * max(int(ea), int(eb))
+        else:
+            ya, yb = _yes(ra["verdict"]), _yes(rb["verdict"])
+            if ya is None or yb is None:
+                continue
+            both_y += ya and yb
+            both_n += (not ya) and (not yb)
+            a_y_b_n += ya and not yb
+            a_n_b_y += (not ya) and yb
+
+    n = both_y + both_n + a_y_b_n + a_n_b_y
+    observed = (both_y + both_n) / n if n else float("nan")
+    pa, pb = (both_y + a_y_b_n) / n if n else 0, (both_y + a_n_b_y) / n if n else 0
+    chance = pa * pb + (1 - pa) * (1 - pb)
+    kappa = (observed - chance) / (1 - chance) if n and chance < 1 else float("nan")
+    return {
+        "yes/no rows compared": n,
+        "yes/no agreement": observed,
+        "kappa": kappa,
+        "list and count rows compared": other_total,
+        "list and count agreement": other_same / other_total if other_total else float("nan"),
+    }
+
+
 def report(result, papers: int, blank: int) -> str:
     lines = [f"{papers} papers", ""]
     width = max((len(k) for k in result), default=10) + 2
@@ -269,10 +322,25 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     m.add_argument("--out", required=True)
     s = sub.add_parser("score", help="score filled-in label sheets")
     s.add_argument("--sheets", required=True)
+    g = sub.add_parser("agree", help="compare two people's sheets for the same papers")
+    g.add_argument("--a", required=True, help="folder of the first set of sheets")
+    g.add_argument("--b", required=True, help="folder of the second set of sheets")
     args = ap.parse_args(argv)
 
     if args.cmd == "make":
         return make(args.pdfs, args.out)
+    if args.cmd == "agree":
+        rows_a, rows_b = read_sheets(args.a), read_sheets(args.b)
+        shared = {r["paper"] for r in rows_a} & {r["paper"] for r in rows_b}
+        if not shared:
+            print("the two folders have no paper in common", file=sys.stderr)
+            return 1
+        rows_a = [r for r in rows_a if r["paper"] in shared]
+        rows_b = [r for r in rows_b if r["paper"] in shared]
+        print(f"{len(shared)} papers in common\n")
+        for name, value in agreement(rows_a, rows_b).items():
+            print(f"{name:32s}{value:.3f}" if isinstance(value, float) else f"{name:32s}{value}")
+        return 0
     rows = read_sheets(args.sheets)
     if not rows:
         print(f"no sheets in {args.sheets}", file=sys.stderr)
