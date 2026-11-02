@@ -338,3 +338,93 @@ def test_long_section_gets_more_budget_than_a_short_one():
     summary = summarize.summarize_paper(paper, target_words=300)
     by_name = {s.name: s.word_count for s in summary.sections}
     assert by_name.get("experiments", 0) > by_name.get("method", 0)
+
+
+# ------------------------------------------- read-out checked on real papers
+#
+# The sentences below come from papers whose read-out was judged by hand; each
+# test is a case the first version got wrong.
+
+
+def test_a_metric_named_only_in_a_caption_is_found():
+    text = (
+        "Table 3: Elementary Property Prediction Task F1-Score (%) - "
+        "Performance Comparison. We summarize the results in Table 3."
+    )
+    assert "F1" in analyze.find_metric_names(text)
+
+
+def test_recall_the_verb_is_not_a_metric():
+    """"Recall that in task 2" used to be read as a recall of 2."""
+    text = (
+        "Recall that in task 2 (Sec. 2), players also rate unmodified headlines. "
+        "Recall that the game has two tasks, as described above."
+    )
+    assert "recall" not in analyze.find_metric_names(text)
+    assert not analyze.find_metrics(text)
+
+
+def test_recall_beside_precision_is_a_metric():
+    text = (
+        "The accuracy of the segmentation was measured in terms of precision, "
+        "recall and F-score, computed on every utterance of the test corpus."
+    )
+    names = analyze.find_metric_names(text)
+    assert "recall" in names and "precision" in names and "F1" in names
+
+
+def test_small_caps_bleu_is_found():
+    """A PDF sets BLEU in small caps and extracts it as "B LEU"."""
+    assert analyze.find_metric_names("System B LEU [%] Word-by-Word 11.1") == ["BLEU"]
+
+
+def test_a_common_word_used_once_in_prose_is_not_a_metric():
+    text = "The method improves accuracy when the corpus is clean enough."
+    assert analyze.find_metric_names(text) == []
+
+
+def test_an_objective_names_a_gap_not_the_topic():
+    text = (
+        "Cyberbullying has been linked to negative mental health outcomes. "
+        "However, existing detection models still struggle on imbalanced "
+        "real-world data. In this paper we perform an extensive evaluation of "
+        "thirteen models on eight different properties of the data."
+    )
+    found = [f.text for f in analyze.find_by_cues(text, "objective", limit=4)]
+    assert any("still struggle" in t for t in found)
+    assert not any("extensive evaluation" in t for t in found)
+    assert not any("linked to negative" in t for t in found)
+
+
+def test_whether_at_the_start_of_a_clause_is_not_a_research_question():
+    text = (
+        "Whether in early literature or in popular culture, conversational "
+        "agents have captured our imagination like no other technology."
+    )
+    assert analyze.find_by_cues(text, "objective") == []
+
+
+def test_a_limitation_is_the_authors_own_not_a_however_sentence():
+    text = (
+        "However, these models were expensive to create for each new domain. "
+        "However, with a large database this should not matter much at all. "
+        "In this study we did not train workers to recognize subtle cues. "
+        "We cannot assert a two-way implication between the two constructs."
+    )
+    found = [f.text for f in analyze.find_by_cues(text, "limitation", limit=4)]
+    assert any("did not train workers" in t for t in found)
+    assert any("cannot assert" in t for t in found)
+    assert not any("expensive to create" in t for t in found)
+    assert not any("should not matter" in t for t in found)
+
+
+def test_dataset_names_drop_platforms_analogies_and_repeats():
+    text = (
+        "We train on the Mboshi5k corpus and the Mboshi5K data. "
+        "We also use SST-2 and SST. "
+        "We hope to drive progress similar to how the Penn Treebank has driven "
+        "progress on parsing."
+    )
+    names = ["Twitter", "Mboshi5k", "Mboshi5K", "SST-2", "SST",
+             "Penn Treebank", "Dataset The MAE", "MAE", "Phonetic"]
+    assert analyze.clean_datasets(names, text) == ["Mboshi5k", "SST-2", "MAE"]

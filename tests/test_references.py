@@ -276,3 +276,30 @@ def test_bibliographical_references_is_a_bibliography_heading():
 
     bucket, _ = sections.classify_heading("7. Bibliographical References")
     assert bucket == "references"
+
+
+COLON = """\
+1. Tang, D., Wei, F., Qin, B., Yang, N., Liu, T., & Zhou, M.: Sentiment Embeddings with Applications to Sentiment Analysis. In: TKDE. (2016) 28(2) 496-509
+2. Dhingra, B., Zhou, Z., Fitzpatrick, D., Muehl, M., & Cohen, W. W.: Tweet2Vec: Character-Based Distributed Representations for Social Media. In: ACL. (2016)
+3. Harris, Z. S.: Distributional structure. In: Word. (1954) 146-162
+"""
+
+
+def test_authors_colon_title_style_is_split_at_the_colon():
+    refs = _parse(COLON)
+    assert refs[0].authors.endswith("& Zhou, M.")
+    assert refs[0].title == "Sentiment Embeddings with Applications to Sentiment Analysis"
+    assert refs[0].year == 2016
+    # Two initials before the colon do not split the author list.
+    assert refs[1].authors.endswith("Cohen, W. W.")
+    assert refs[1].title.startswith("Tweet2Vec: Character-Based")
+    assert (refs[2].authors, refs[2].title, refs[2].year) == (
+        "Harris, Z. S.", "Distributional structure", 1954)
+
+
+def test_a_colon_inside_a_title_is_not_an_author_separator():
+    refs = _parse(NUMBERED)
+    assert refs[3].title.startswith("Mmdetection: Open mmlab")
+    assert R.parse_entry(
+        "Zeiler, Matthew D. Adadelta: An adaptive learning rate method. 2012."
+    ).title == "Adadelta: An adaptive learning rate method"

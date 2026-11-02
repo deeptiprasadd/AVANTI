@@ -29,6 +29,21 @@ paper's work (for example a prior method) is an `n`.
 Leave `verdict` blank only for rows you cannot judge. Blank rows are not
 counted.
 
+## Conventions
+
+- A dataset is a named dataset or corpus. A platform ("Twitter"), a model
+  ("Clarifai") or a phrase that merely contains a name is an `n`.
+- The same dataset listed twice ("Mboshi5k", "Mboshi5K", or "SST" next to
+  "SST-2") is `y` the first time and `n` for the repeats.
+- A word that only looks like a metric ("Recall that ...") is an `n`.
+- Accents that the PDF turned into loose marks ("Ku¨c¸u¨k") are tolerated in
+  a reference. A cut-off name ("et a"), a missing first name, an arXiv number
+  read as a year, or a title that runs into the venue is an `n`.
+- A reference that really has no year or no authors is correct if the sheet
+  also leaves them empty.
+- Reference counts are checked against the rendered PDF pages, not the
+  extracted text.
+
 ## Rules that keep the numbers honest
 
 - Judge from the PDF, not from what seems plausible.

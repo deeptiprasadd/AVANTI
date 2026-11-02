@@ -43,6 +43,13 @@ class Analysis:
         return self.doc.title or "Untitled paper"
 
 
+def _before_references(paper: sections.Paper) -> str:
+    """Everything up to the bibliography, small print and captions included."""
+    names = [s.name for s in paper.sections]
+    end = names.index("references") if "references" in names else len(names)
+    return "\n".join([paper.unsectioned] + [s.text for s in paper.sections[:end]])
+
+
 def _span(stage: str, fraction: float) -> float:
     lo, hi = _STAGE_SPAN.get(stage, (0.0, 1.0))
     return lo + (hi - lo) * max(0.0, min(1.0, fraction))
@@ -83,7 +90,10 @@ def run(
         return doc.page_of_offset(doc.text.find(sentence[:60]))
 
     report("analyzing", 0.3, "Extracting claims and metrics")
-    brief = analyze.brief(paper.body, section_map, page_lookup)
+    brief = analyze.brief(
+        paper.body, section_map, page_lookup,
+        metric_text=_before_references(sections.analyze(doc.full_text)),
+    )
 
     report("summarizing", 0.4, "Summarizing by section")
     summary = summarize.summarize_paper(paper, target_words=target_words)

@@ -271,7 +271,9 @@ def _ends_authors_at_initial(after: str) -> bool:
         return False
     # Another initial needs its own full stop: a bare "A" opens a title
     # ("Andrew W. A fast natural newton method").
-    if re.fullmatch(r"(?:[A-Z]\.)+", token):
+    # (A colon after it, "Cohen, W. W.: Tweet2Vec", closes the author list
+    # at the last initial, not this one.)
+    if re.fullmatch(r"(?:[A-Z]\.)+:?", token):
         return False
     # "A. Vaswani et al." and "J. Smith and K. Lee": a surname, still authors.
     if len(tokens) > 1 and tokens[1] in ("et", "and", "&"):
@@ -300,6 +302,37 @@ def _segments(entry: str) -> List[str]:
     return [p for p in parts if p]
 
 
+# Words an author list can hold besides names and initials.
+_AUTHOR_FILLER = {
+    "and", "et", "al", "de", "van", "von", "der", "den", "di", "da", "dos",
+    "du", "la", "le", "bin", "ibn", "ter", "jr", "eds", "ed",
+}
+
+
+def _colon_style(first_segment: str):
+    """Split "Authors: Title. In: Venue. (Year)", as Springer sets it.
+
+    The author list ends in a colon, not a full stop, so the first segment
+    comes out holding both the authors and the title. Returns (authors,
+    title), or None when the colon in that segment is not closing an author
+    list: a colon inside a title ("Bert: Pre-training of ...") comes after
+    ordinary lowercase words, which an author list does not hold, and after
+    the year in ACL style.
+    """
+    i = first_segment.find(":")
+    if i < 5 or i > 320:
+        return None
+    prefix = first_segment[:i].strip()
+    if _YEAR.search(prefix):
+        return None
+    words = re.findall(r"[A-Za-z'’\-]+", prefix)
+    if any(w[0].islower() and w.lower() not in _AUTHOR_FILLER for w in words):
+        return None
+    if not re.search(r",| and |&|\b[A-Z]\.", prefix):
+        return None
+    return prefix, first_segment[i + 1:].strip()
+
+
 def parse_entry(entry: str) -> Reference:
     """Pull authors, title, year and identifiers out of one entry."""
     ref = Reference(text=entry)
@@ -326,9 +359,13 @@ def parse_entry(entry: str) -> Reference:
     # IEEE style puts the title in quotes; trust that when it is there.
     quoted = re.search(r"[\"“](.{8,250}?)[,.]?[\"”]", body)
     parts = _segments(body)
+    colon = _colon_style(parts[0]) if parts and not quoted else None
     if quoted:
         ref.title = quoted.group(1).strip(" ,.")
         ref.authors = body[: quoted.start()].strip(" ,.")
+    elif colon:
+        ref.authors = colon[0].strip(" ,.")
+        ref.title = colon[1].strip(" ,.")
     elif parts:
         # "Zemel, R. 2017. Title": the year can sit inside the first segment
         # when the author list ends on an initial.

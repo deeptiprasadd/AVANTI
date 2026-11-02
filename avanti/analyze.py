@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -159,6 +159,70 @@ class MetricHit:
     page: Optional[int] = None
 
 
+# "Recall that in task 2 ..." is a verb, and "2" a task number, not a score.
+_RECALL_VERB = re.compile(r"\brecall\s+that\b", re.I)
+
+# Metrics a paper uses are often named without a number beside them -- in a
+# table caption, or "we measure precision, recall and F-score". Each entry is
+# (name shown, pattern, distinctive). A distinctive name ("BLEU") is a metric
+# on one mention in an evaluating context; a common word ("accuracy",
+# "precision") has to be used that way twice, or it is just prose.
+_METRIC_FORMS = (
+    ("accuracy", re.compile(r"\b[Aa]ccuracy\b"), False),
+    ("precision", re.compile(r"\b[Pp]recision\b"), False),
+    ("recall", re.compile(r"\b[Rr]ecall\b(?!\s+that\b)"), False),
+    ("F1", re.compile(r"\bF\s?-?\s?1(?:[- ]?[Ss]cores?)?\b|\bF-[Ss]cores?\b"
+                      r"|\bF-[Mm]easure\b"), True),
+    # Small caps come out of a PDF as "B LEU", so the first letter may be
+    # split from the rest.
+    ("BLEU", re.compile(r"\bB ?LEU\b"), True),
+    ("ROUGE", re.compile(r"\bR ?OUGE(?:-[A-Z0-9]+)?\b"), True),
+    ("METEOR", re.compile(r"\bM ?ETEOR\b"), True),
+    ("AUC", re.compile(r"\bAU(?:ROC|PRC|C)\b"), True),
+    ("mAP", re.compile(r"\bmAP\b"), True),
+    ("MRR", re.compile(r"\bMRR\b"), True),
+    ("NMI", re.compile(r"\bNMI\b"), True),
+    ("IoU", re.compile(r"\bm?IoU\b"), True),
+    ("EER", re.compile(r"\bEER\b"), True),
+    ("minDCF", re.compile(r"\bmin-?DCF\b", re.I), True),
+    ("WER", re.compile(r"\bWER\b"), True),
+    ("RMSE", re.compile(r"\bRMSE\b"), True),
+    ("hits@k", re.compile(r"\b[Hh]its@\s?\w+"), True),
+    ("perplexity", re.compile(r"\b[Pp]erplexity\b"), False),
+    ("correlation", re.compile(r"\b(?:Pearson|Spearman|Kendall)\b"), False),
+)
+
+# What makes a mention an evaluation rather than prose: a number or percent
+# beside it, or the vocabulary of measuring. "Recall" also needs a sibling
+# metric, since "we recall" and "recall the problem" are ordinary English.
+_EVAL_CONTEXT = re.compile(
+    r"\d|%|\b(?:metrics?|scores?|measured?|measures|evaluat\w*|report\w*|"
+    r"table|achiev\w*|compar\w*)\b", re.I
+)
+_RECALL_CONTEXT = re.compile(
+    r"%|@|\bprecision\b|\bF\s?-?\s?1\b|\bF-?scores?\b|\bF-?measure\b|"
+    r"\bmetrics?\b|\bmeasured?\b|\baccuracy\b", re.I
+)
+_CONTEXT_CHARS = 70
+
+
+def find_metric_names(text: str, limit: int = 8) -> List[str]:
+    """Names of the metrics the paper evaluates with, most-used first."""
+    flat = normalize_spaces(text)
+    found: List[Tuple[int, str]] = []
+    for name, pattern, distinctive in _METRIC_FORMS:
+        used = 0
+        for m in pattern.finditer(flat):
+            near = flat[max(0, m.start() - _CONTEXT_CHARS) : m.end() + _CONTEXT_CHARS]
+            check = _RECALL_CONTEXT if name == "recall" else _EVAL_CONTEXT
+            if check.search(near):
+                used += 1
+        if used >= (1 if distinctive else 2):
+            found.append((used, name))
+    found.sort(key=lambda t: -t[0])
+    return [name for _, name in found[:limit]]
+
+
 def find_metrics(text: str, page_lookup=None, limit: int = 25) -> List[MetricHit]:
     """Extract reported metric values with the sentence that stated them."""
     hits: List[MetricHit] = []
@@ -167,6 +231,8 @@ def find_metrics(text: str, page_lookup=None, limit: int = 25) -> List[MetricHit
     for sent in clean_sentences(text, min_chars=20):
         for pattern in _METRIC_PATTERNS:
             for m in pattern.finditer(sent):
+                if _RECALL_VERB.match(m.group(0)):
+                    continue
                 groups = m.groups()
                 # Pattern 1 is (name, value, unit); pattern 2 is (value, unit, name).
                 if groups[0] and groups[0][0].isalpha():
@@ -310,6 +376,80 @@ def cue_score(sentence: str, kind: str) -> float:
     )
 
 
+# Extra evidence for the paper read-out only. The cue weights above are shared
+# with question answering, whose ranking is tuned on them, so what the read-out
+# alone needs lives here. Checked against papers read by hand, the bare cues
+# picked "we perform an extensive evaluation" as the problem, and a sentence
+# beginning "However" -- about earlier work, or answering an objection -- as
+# the paper's own limitation.
+def _rx(*patterns: Tuple[str, float]):
+    return tuple((re.compile(p, re.I), w) for p, w in patterns)
+
+
+_BRIEF_BONUS = {
+    # A gap in what is known or can be done, or a question the paper answers.
+    # The bare words "problem" and "challenge" are not enough: background
+    # about the topic ("cyberbullying is a serious problem") uses them too.
+    "objective": _rx(
+        (r"\b(?:however|but|yet|despite|although)\b[^.]{0,120}\b(?:lack\w*|"
+         r"limited|difficult\w*|challeng\w+|unclear|unknown|fail\w*|struggle\w*|"
+         r"suffer\w*|remain\w*|not (?:well |yet )?(?:understood|explored|"
+         r"studied))\b", 1.5),
+        (r"\b(?:little|few|no) (?:is|are|work|studies|research)\b[^.]{0,40}"
+         r"\b(?:known|understood|done|explored|studied|exist\w*)\b", 1.5),
+        (r"\bremains? (?:an? )?(?:open|unsolved|challenging|difficult)\b", 1.0),
+        (r"\b(?:is|are) (?:often |still |very )?(?:difficult|challenging) to\b", 1.0),
+        # "whether" is left out: "Whether in literature or in popular culture"
+        # is not a question the paper asks.
+        (r"\b(?:to what extent|the (?:extent|degree) to which|"
+         r"how (?:to|well|much))\b", 1.5),
+    ),
+    # The authors speaking about their own work and what it cannot do.
+    "limitation": _rx(
+        (r"\b(?:we|our)\b[^.]{0,80}\b(?:cannot|can ?not|unable|not able|"
+         r"restricted to|limited to|not (?:been )?(?:evaluated|tested|"
+         r"considered|addressed|explored))\b", 1.0),
+    ),
+}
+
+_BRIEF_PENALTY = {
+    "objective": _rx(
+        # What they did, not what they set out to solve.
+        (r"\bwe (?:have )?(?:propos|present|introduc|develop|describ|perform|"
+         r"conduct|build|built|design)\w*", 2.0),
+        # A result.
+        (r"\b(?:outperform\w*|state[- ]of[- ]the[- ]art)\b|\d\s*%", 2.0),
+        (r"\b(?:organi[sz]ed|structured) as follows\b|\bthe (?:rest|remainder) of\b",
+         3.0),
+        (r"\bwe (?:look|take a look|talk|discuss)\b", 1.5),
+        (r"^\s*while (?:they|these|previous|prior|existing)\b", 1.5),
+    ),
+    "limitation": _rx(
+        # About earlier work, not the paper's own.
+        (r"\b(?:existing|previous|prior|earlier|traditional|these) "
+         r"(?:work|approaches|methods|models|systems|studies)\b", 1.5),
+        # "However ..." with no "we" or "our": not the authors' admission.
+        (r"^\s*however,?\s(?!.*\b(?:we|our)\b)", 1.0),
+        (r"\bshould not matter\b|\bnot a (?:big |major )?(?:problem|issue)\b", 2.0),
+    ),
+}
+
+# A bare "however" says nothing about limits; it needs another cue beside it.
+_HOWEVER = re.compile(r"\bhowever,?\s", re.I)
+_HOWEVER_WEIGHT = 1.2
+
+
+def _brief_score(sent: str, kind: str) -> Tuple[float, float]:
+    """(cue strength, adjustment) for the read-out. A sentence is kept when
+    either the cues or the extra evidence is positive."""
+    cues = cue_score(sent, kind)
+    if kind == "limitation" and _HOWEVER.search(sent):
+        cues -= _HOWEVER_WEIGHT
+    bonus = sum(w for p, w in _BRIEF_BONUS.get(kind, ()) if p.search(sent))
+    penalty = sum(w for p, w in _BRIEF_PENALTY.get(kind, ()) if p.search(sent))
+    return cues, bonus - penalty
+
+
 def find_by_cues(
     text: str,
     kind: str,
@@ -326,15 +466,20 @@ def find_by_cues(
 
     sal = _salience(sents)
     scored: List[Finding] = []
+    tuned = kind in _BRIEF_BONUS
 
     for i, sent in enumerate(sents):
-        cues = cue_score(sent, kind)
-        if cues <= 0:
+        cues, adjust = _brief_score(sent, kind)
+        if cues <= 0 and not (tuned and adjust > 0):
             continue
         # Prefer sentences that are informative as well as cue-bearing, and
         # mildly penalize very long ones, which tend to ramble.
         length_penalty = 0.4 if len(sent.split()) > 55 else 0.0
-        total = cues + 0.8 * sal.get(i, 0.0) - length_penalty
+        total = cues + adjust + 0.8 * sal.get(i, 0.0) - length_penalty
+        # A read-out sentence that the evidence argues against is dropped, not
+        # shown last: an empty slot is better than a wrong sentence.
+        if tuned and total < 1.0:
+            continue
         scored.append(
             Finding(
                 kind=kind,
@@ -361,6 +506,60 @@ def find_by_cues(
     return kept
 
 
+# Names that "<Name> dataset" picks up but that are a place data comes from,
+# not a dataset.
+_PLATFORMS = frozenset({
+    "twitter", "facebook", "instagram", "youtube", "reddit", "weibo", "flickr",
+    "amazon", "google", "yahoo", "linkedin", "tiktok", "whatsapp",
+})
+
+# A dataset named only to say what the paper hopes to become -- "like the Penn
+# Treebank, SQuAD and ImageNet have driven progress" -- is not one it uses.
+_ANALOGY = re.compile(
+    r"\b(?:driven progress|similar to how|just as|analogous to|in the same way|"
+    r"notable examples)\b",
+    re.I,
+)
+
+_LEADING_WORD = re.compile(r"^(?:(?:the|dataset|corpus|a|an)\s+)+", re.I)
+
+# One-word "names" that are only an adjective or a kind of data.
+_GENERIC_NAMES = frozenset({
+    "phonetic", "acoustic", "image", "images", "text", "speech", "audio",
+    "video", "training", "testing", "test", "validation", "evaluation",
+    "development", "public", "private", "target", "source", "english",
+    "french", "german", "chinese", "spanish", "large", "small", "new",
+})
+
+
+def clean_datasets(names: List[str], text: str) -> List[str]:
+    """Drop platforms, analogies and repeats from the dataset names found.
+
+    Repeats are the same name differing in case, a leading "The" or "Dataset",
+    or a shorter form of a longer one ("SST" beside "SST-2").
+    """
+    sentences = clean_sentences(text, min_chars=20)
+    cleaned: List[str] = []
+    for name in names:
+        name = _LEADING_WORD.sub("", name).strip()
+        if not name or name.lower() in _PLATFORMS | _GENERIC_NAMES:
+            continue
+        mentions = [s for s in sentences if name in s]
+        if mentions and all(_ANALOGY.search(s) for s in mentions):
+            continue
+        cleaned.append(name)
+
+    out: List[str] = []
+    for name in cleaned:
+        low = name.lower()
+        if any(other.lower().startswith(low + "-") for other in cleaned):
+            continue
+        if any(kept.lower() == low for kept in out):
+            continue
+        out.append(name)
+    return out
+
+
 @dataclass
 class Brief:
     """The structured read-out for a paper."""
@@ -373,6 +572,8 @@ class Brief:
     datasets: List[str]
     metrics: List[MetricHit]
     phrases: List[str]
+    # Metrics the paper evaluates with, including ones named without a number.
+    metric_names: List[str] = field(default_factory=list)
 
     @property
     def is_empty(self) -> bool:
@@ -383,12 +584,16 @@ class Brief:
 
 
 def brief(paper_text: str, sections_map: Optional[Dict[str, str]] = None,
-          page_lookup=None) -> Brief:
+          page_lookup=None, metric_text: Optional[str] = None) -> Brief:
     """Build the structured read-out.
 
     Where the paper's sections are known, each category is searched in the
     section most likely to contain it -- limitations belong to the
     discussion, not the introduction -- which cuts false positives sharply.
+
+    `metric_text` is the paper's text including small print and table
+    captions, up to the bibliography: that is where a metric is named, and
+    the analysis text drops it.
     """
     sections_map = sections_map or {}
 
@@ -399,12 +604,17 @@ def brief(paper_text: str, sections_map: Optional[Dict[str, str]] = None,
         return paper_text
 
     intro = source("introduction", "abstract")
+    # The abstract states the problem most plainly, so the problem is looked
+    # for there as well as in the introduction.
+    framing = "\n".join(
+        t for t in (sections_map.get("abstract"), sections_map.get("introduction")) if t
+    ) or intro
     method = source("method", "introduction")
     data = source("experiments", "method")
     disc = source("discussion", "conclusion", "results")
     results_text = source("results", "experiments")
 
-    objective = find_by_cues(intro, "objective", 4, page_lookup)
+    objective = find_by_cues(framing, "objective", 4, page_lookup)
     contribution = find_by_cues(
         intro + "\n" + method, "contribution", 6, page_lookup
     )
@@ -429,7 +639,11 @@ def brief(paper_text: str, sections_map: Optional[Dict[str, str]] = None,
         dataset_mentions=find_by_cues(data, "dataset", 3, page_lookup),
         limitation=find_by_cues(disc, "limitation", 4, page_lookup),
         future=find_by_cues(disc, "future", 3, page_lookup),
-        datasets=find_datasets(paper_text),
+        datasets=clean_datasets(find_datasets(paper_text), paper_text),
         metrics=find_metrics(results_text or paper_text, page_lookup),
         phrases=key_phrases(paper_text),
+        metric_names=find_metric_names(
+            metric_text
+            or "\n".join(t for t in (paper_text, sections_map.get("abstract")) if t)
+        ),
     )
