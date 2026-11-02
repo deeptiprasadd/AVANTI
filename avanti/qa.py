@@ -113,10 +113,10 @@ _INTENTS: Dict[str, Tuple[Set[str], Dict[str, float], Optional[str]]] = {
 }
 
 # Weight of a related (expansion) term relative to the asker's own words.
-_RELATED_WEIGHT = 0.35
+_RELATED_WEIGHT = 0.2
 
 # Weight of intent-signalling phrasing relative to the best lexical match.
-_CUE_WEIGHT = 0.8
+_CUE_WEIGHT = 0.2
 
 # Sections whose sentences are not answers: a bibliography entry shares a
 # lot of vocabulary with the paper and used to surface as one.
@@ -250,14 +250,14 @@ class PaperIndex:
         return self._cues[kind]
 
     @staticmethod
-    def _query(question: str) -> Tuple[Dict[str, float], List[str]]:
+    def _query(question: str, expand: bool = True) -> Tuple[Dict[str, float], List[str]]:
         """Weighted query terms and detected intents for a question."""
         tokens = re.findall(r"[a-z0-9]{2,}", question.lower())
         content = [t for t in tokens if t not in _QUESTION_WORDS]
         stems = [_stem(t) for t in content]
 
         weights: Dict[str, float] = {}
-        for stem in stems:
+        for stem in stems if expand else ():
             for related in _RELATED_TERMS.get(stem, ()):
                 weights[related] = _RELATED_WEIGHT
         # The asker's own words always outweigh the expansion.
@@ -270,19 +270,33 @@ class PaperIndex:
         ]
         return weights, intents
 
-    def ask(self, question: str, k: int = 5, min_score: float = 0.25) -> List[Answer]:
+    def ask(
+        self,
+        question: str,
+        k: int = 5,
+        min_score: float = 0.25,
+        *,
+        expand: bool = True,
+        section_prior: bool = True,
+        cues: bool = True,
+    ) -> List[Answer]:
         """Return the k passages that best answer the question.
 
         Answers scoring below `min_score` times the best answer's score are
         dropped rather than shown as padding.
+
+        `expand`, `section_prior` and `cues` switch off, one at a time, the
+        three things layered on top of plain BM25: related-word expansion,
+        the per-intent section boost, and intent-phrasing cues. They exist
+        so the evaluation can measure what each one contributes.
         """
         if not self.ready or not question.strip():
             return []
 
-        weights, intents = self._query(question)
+        weights, intents = self._query(question, expand)
         if not weights:
             return []
-        if "data" in intents:
+        if expand and "data" in intents:
             for name in self.datasets:
                 for term in _words(name):
                     weights.setdefault(term, _RELATED_WEIGHT)
@@ -294,11 +308,12 @@ class PaperIndex:
         boost = np.ones(len(self.passages))
         for name in intents:
             _, section_boost, cue_kind = _INTENTS[name]
-            boost = np.maximum(
-                boost,
-                np.array([section_boost.get(p.kind, 1.0) for p in self.passages]),
-            )
-            if cue_kind:
+            if section_prior:
+                boost = np.maximum(
+                    boost,
+                    np.array([section_boost.get(p.kind, 1.0) for p in self.passages]),
+                )
+            if cues and cue_kind:
                 relevance = relevance + _CUE_WEIGHT * self._cue_strength(cue_kind)
 
         # A passage must share a word with the question, or -- for a question
