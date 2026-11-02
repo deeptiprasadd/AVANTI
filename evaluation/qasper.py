@@ -221,6 +221,7 @@ def build_systems(dense_model: Optional[str]) -> Dict[str, System]:
                   file=sys.stderr)
         else:
             systems["Dense"] = dense
+            systems["Dense + BM25 (RRF)"] = fuse(systems["BM25 (plain)"], dense)
             systems["AVANTI + Dense (RRF)"] = fuse(systems["AVANTI (full)"], dense)
     return systems
 
@@ -310,6 +311,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             continue
         d, lo, hi = paired_difference(rows, name, "BM25 (plain)")
         print(f"  {name.strip():28s} {d:+.3f}  [{lo:+.3f}, {hi:+.3f}]")
+
+    if "AVANTI + Dense (RRF)" in rows and "Dense + BM25 (RRF)" in rows:
+        d, lo, hi = paired_difference(rows, "AVANTI + Dense (RRF)", "Dense + BM25 (RRF)")
+        print("\nAVANTI steering on top of an ordinary hybrid (paired MRR, 95% interval):")
+        print(f"  AVANTI + Dense vs Dense + BM25  {d:+.3f}  [{lo:+.3f}, {hi:+.3f}]")
 
     if args.out:
         with open(args.out, "w", encoding="utf-8") as fh:
