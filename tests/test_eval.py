@@ -52,6 +52,16 @@ def test_metrics_for_a_ranking():
     assert got["recall@3"] == 0.5 and got["recall@5"] == 1.0
 
 
+def test_paired_difference_is_the_mean_of_per_question_gaps():
+    rows = {
+        "a": [{"MRR": 1.0}, {"MRR": 0.5}, {"MRR": 0.5}, {"MRR": 1.0}],
+        "b": [{"MRR": 0.5}, {"MRR": 0.5}, {"MRR": 0.0}, {"MRR": 0.5}],
+    }
+    mean, lo, hi = qasper.paired_difference(rows, "a", "b")
+    assert mean == 0.375
+    assert 0.0 < lo <= mean <= hi <= 0.5
+
+
 def test_section_prior_finds_the_limitation_in_the_discussion(tmp_path):
     papers = qasper.load(_file(tmp_path))
     rows = qasper.evaluate(papers, qasper.build_systems(None))
