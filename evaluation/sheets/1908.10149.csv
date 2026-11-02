@@ -1,0 +1,13 @@
+﻿paper,task,question,prediction,verdict,entry
+1908.10149,title,Is this the paper's actual title?,Incremental Improvement of a Question Answering System by Re-ranking Answer Candidates using Machine Learning,,
+1908.10149,dataset,Is this a dataset the paper uses or evaluates on?,QA,,
+1908.10149,dataset_missed,Datasets the paper uses that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,
+1908.10149,metric_missed,Metrics the paper reports that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,
+1908.10149,finding:objective,Does this sentence correctly state the problem the paper addresses?,"In this work, we examine the problem of incrementally improving deployed QA systems in an industrial setting.",,
+1908.10149,finding:objective,Does this sentence correctly state the problem the paper addresses?,"First, we examine existing data (data understanding) and prepare a corpus for training (data preparation).",,
+1908.10149,finding:objective,Does this sentence correctly state the problem the paper addresses?,"Third, we investigate the effectiveness and efficiency of re-ranking in improving our QA pipeline after the deployment phase of CRISP.",,
+1908.10149,finding:limitation,Does this sentence correctly state the limitation the authors admit?,A major limitation is that the re-ranking algorithm cannot choose answer candidates beyond the top-10 results.,,
+1908.10149,finding:limitation,Does this sentence correctly state the limitation the authors admit?,"For example, we did not integrate spell-checking in our re-ranking method which proved to be effective in our baseline evaluation.",,
+1908.10149,finding:limitation,Does this sentence correctly state the limitation the authors admit?,"However, the performance gain is small, which might have several reasons.",,
+1908.10149,reference_count,How many entries does the paper's reference list really have? (type the number in the entry column),1,,
+1908.10149,reference,"Are authors, title and year all correct for this entry? (y only if all three are right)","Kaiser, Manjunath Kudlur, Josh Levenberg, Dandelion Mane´, Rajat Monga, Sherry Moore, Derek Murray, Chris Olah, Mike Schuster, Jonathon Shlens, Benoit Steiner, Ilya Sutskever, Kunal Talwar, Paul Tucker, Vincent Vanhoucke, Vijay Vasudevan, Fernanda Vie´gas, Oriol Vinyals, Pete Warden, Martin Wattenberg, Martin Wicke, Yuan Yu, and Xiaoqiang Zheng | TensorFlow: Large-scale machine learning on heterogeneous systems, 2015 | 2015",,

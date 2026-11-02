@@ -1,0 +1,7 @@
+﻿paper,task,question,prediction,verdict,entry
+1703.05320,title,Is this the paper's actual title?,Legal Question Answering using Ranking SVM and Deep Convolutional Neural Network,,
+1703.05320,dataset_missed,Datasets the paper uses that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,
+1703.05320,metric_missed,Metrics the paper reports that are NOT listed above. Separate with ; and leave blank if none. (type in the entry column),,,
+1703.05320,finding:contribution,Does this sentence correctly state the contribution (what the authors built or propose)?,"Our experiments benefit legal domain in selecting appropriate features for building a ranking model. - We analyze the provided training data and conclude that: (i) splitting legal articles into multiple single-paragraph articles, (ii) carefully initializing parameters for CNN significantly improved the performance of legal QA system, and (iii) integrating additional features in IR task into QA task leads to better results. - We propose to classify a query-article pair into ""YES"" or ""NO"" by voting, in which the score of a pair is generated from legal IR and legal QA model.",,
+1703.05320,finding:contribution,Does this sentence correctly state the contribution (what the authors built or propose)?,"After building a legal QA system, we show experimental results along with discussion and analysis.",,
+1703.05320,reference_count,How many entries does the paper's reference list really have? (type the number in the entry column),0,,

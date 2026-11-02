@@ -38,3 +38,6 @@ $RECYCLE.BIN/
 
 # ---- Local tooling ----
 .claude/
+
+# Downloaded papers used for labelling (not ours to redistribute)
+evaluation/papers/
