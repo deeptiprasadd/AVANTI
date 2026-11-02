@@ -1,0 +1,4 @@
+# Only needed to run the dense-retrieval baseline in evaluation/qasper.py.
+# Not part of the app or CI.
+-r requirements.txt
+fastembed>=0.3
