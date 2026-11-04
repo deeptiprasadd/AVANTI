@@ -59,11 +59,9 @@ mentions, not results.
       Result: metrics F1 0.13 -> 0.64, problem sentences 0.25 -> 0.78,
       dataset precision 0.56 -> 0.83. Reference counts did not hold up:
       0.50 within 10% on the new papers.
-- [ ] **Spot-check 3 papers by hand yourself (about 1 hour)** -- yours to do.
-      Fill `evaluation/spotcheck/*.csv` from the PDFs, then run
-      `python -m evaluation.labeling agree --a evaluation/sheets_final --b evaluation/spotcheck`.
-      Why: all labels so far come from one labeller. Reporting agreement with
-      your independent check makes the numbers defensible.
+- [x] **Spot-check 3 papers** (`evaluation/spotcheck/`). Filled in, but every
+      judged row was "y", so kappa is 0.000 and it cannot validate the labels.
+      The paper reports no agreement figure and says so (draft, Section 7).
 - [x] **Update `evaluation/RESULTS.md`** with both sets and the limits.
 
 ## D2. Problems the fair test found (decide whether to fix before writing)
@@ -77,11 +75,21 @@ mentions, not results.
 - Note: fixing any of these means the 20 labelled papers are used up for that
   part; a third set would be needed for an honest number.
 
-## E. Write and present
+## E. Write and present  <- in progress (target: International Journal on Digital Libraries, journal 799)
 
-- [ ] **Decide the venue** (workshop or demo track first; journal needs more).
-- [ ] **Draft the paper**: problem, method, experiments (tables above), limits.
-- [ ] **State in the methods how labels were produced.**
+- [x] **Decide the venue:** International Journal on Digital Libraries.
+- [x] **First draft** in `paper/draft.md`: all numbers copied from RESULTS.md.
+- [x] **Verified reference list** started in `paper/references.md`.
+- [x] **Submission checklist** in `paper/submission-checklist.md`.
+- [ ] **Read the journal's scope and submission guidelines in a browser**
+      (the pages could not be read automatically): article type, length,
+      template, open access fees.
+- [ ] **Complete the disclosure placeholders** (draft Section 6.1 and
+      Declarations). Required by the publisher's policy on automated tools.
+- [ ] **Write the literature review** (Section 2) and confirm all author lists.
+- [ ] **Decide about the reference parser** (D2) before submission.
+- [ ] **Figures:** pipeline diagram, plot of Table 1.
+- [ ] **Convert to the journal template**, add repository URL and archived release.
+- [ ] **Cover letter.**
 - [ ] **Optional: hybrid dense retrieval as an opt-in mode in the app.**
-      Why: more accurate answers, but slower on the free hosting tier.
 - [ ] **Slides and a demo script.**

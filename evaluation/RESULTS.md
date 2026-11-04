@@ -107,7 +107,8 @@ The fixes between the sets: metric names are found without a number beside
 them (and "Recall that..." is no longer a metric); the problem sentence must
 state a gap or a question; a bare "However" no longer makes a limitation;
 platforms, analogies and repeats are dropped from the dataset list; and
-bibliographies in four more styles are read.
+reference entries in the `Authors: Title.` form are split correctly. (Four
+other bibliography styles were fixed before set 1 was labelled.)
 
 ## What this shows
 
@@ -126,9 +127,10 @@ bibliographies in four more styles are read.
 ## Limits
 
 - Ten papers per set, one field (NLP), one source (arXiv).
-- A single labeller made all of these judgements. They have not yet been
-  checked by an independent person; `spotcheck/` holds three blank sheets for
-  that, and `python -m evaluation.labeling agree` compares them.
+- A single source made all of these judgements. A check on three papers
+  (`spotcheck/`) was filled in, but every row it judged was marked correct,
+  including entries that are visibly wrong, so it does not discriminate and no
+  agreement figure is reported. Kappa on it is 0.000.
 - Recall for datasets and metrics is measured against what the labeller found
   in each paper, not an exhaustive list.
 - Limitation sentences could not be assessed on set 2, because the tool
